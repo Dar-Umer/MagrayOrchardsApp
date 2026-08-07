@@ -161,22 +161,6 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (_isRegister || _passwordLogin) ...[
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Please enter your password';
-                          if (_isRegister && v.length < 8) return 'Password must be at least 8 characters';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
@@ -194,6 +178,22 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                       ),
                       validator: _validatePhone,
                     ),
+                    if (_isRegister || _passwordLogin) ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Please enter your password';
+                          if (_isRegister && v.length < 8) return 'Password must be at least 8 characters';
+                          return null;
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     if (!_isRegister)
                       Align(

@@ -211,15 +211,6 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                TextButton(
-                  onPressed: _resendSeconds > 0 ? null : _resendOtp,
-                  child: Text(
-                    _resendSeconds > 0
-                        ? 'Resend OTP in ${_resendSeconds}s'
-                        : 'Resend OTP',
-                    style: TextStyle(color: _resendSeconds > 0 ? Colors.grey : theme.colorScheme.primary),
-                  ),
-                ),
               ],
             ),
           ),
