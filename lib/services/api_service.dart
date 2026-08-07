@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../models/service_booking.dart';
 
 class ApiService {
   static String? _token;
@@ -174,6 +174,123 @@ class ApiService {
   static Future<dynamic> delete(String endpoint) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     return _makeRequest(() => http.delete(uri, headers: _headers()));
+  }
+
+  // ─── Service bookings ─────────────────────────────────────────────────
+
+  /// Price quote for a service at an optional destination. Public.
+  static Future<Map<String, dynamic>> fetchQuote(
+    String slug, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    final response = await get('/services/$slug/quote', queryParams: {
+      if (latitude != null) 'latitude': latitude.toString(),
+      if (longitude != null) 'longitude': longitude.toString(),
+    });
+    return Map<String, dynamic>.from((response as Map)['data'] as Map);
+  }
+
+  /// Availability for every date in a range keyed by `YYYY-MM-DD`. Auth required.
+  static Future<Map<String, Map<String, dynamic>>> fetchAvailabilityRange({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final response = await get('/bookings/availability', queryParams: {
+      if (startDate != null) 'start_date': _dateStr(startDate),
+      if (endDate != null) 'end_date': _dateStr(endDate),
+    });
+    final data = Map<String, dynamic>.from((response as Map)['data'] as Map);
+    final dates = data['dates'] is Map
+        ? Map<String, dynamic>.from(data['dates'] as Map)
+        : <String, dynamic>{};
+    return dates.map((key, value) =>
+        MapEntry(key, Map<String, dynamic>.from(value as Map)));
+  }
+
+  /// Create a service booking. Auth required. Returns the persisted booking map.
+  static Future<Map<String, dynamic>> createServiceBooking({
+    required String slug,
+    required DateTime bookingDate,
+    required String timeSlot,
+    double? latitude,
+    double? longitude,
+    String? address,
+    String? notes,
+    String? orchardDetails,
+  }) async {
+    final response = await post('/services/$slug/book', body: {
+      'booking_date': _dateStr(bookingDate),
+      'booking_time': timeSlot,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (address != null && address.isNotEmpty) 'address': address,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (orchardDetails != null && orchardDetails.isNotEmpty)
+        'orchard_details': orchardDetails,
+    });
+    final body = Map<String, dynamic>.from(response as Map);
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  /// List the authenticated user's bookings.
+  static Future<List<ServiceBookingModel>> fetchMyBookings() async {
+    final response = await get('/bookings');
+    final body = Map<String, dynamic>.from(response as Map);
+    final data = body['data'] is Map
+        ? Map<String, dynamic>.from(body['data'] as Map)
+        : body;
+
+    final list = (data['data'] is List)
+        ? (data['data'] as List)
+        : (data['bookings'] is List ? data['bookings'] as List : <dynamic>[]);
+
+    return list
+        .map((item) => ServiceBookingModel.fromJson(
+            Map<String, dynamic>.from(item as Map)))
+        .toList();
+  }
+
+  /// Create a Razorpay order for a booking. Auth required.
+  static Future<Map<String, dynamic>> createBookingPayment(int bookingId) async {
+    final response = await post('/bookings/$bookingId/payment/create', body: {});
+    final body = Map<String, dynamic>.from(response as Map);
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  /// Verify a completed Razorpay payment for a booking. Auth required.
+  static Future<Map<String, dynamic>> verifyBookingPayment(
+    int bookingId, {
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    final response = await post('/bookings/$bookingId/payment/verify', body: {
+      'razorpay_order_id': razorpayOrderId,
+      'razorpay_payment_id': razorpayPaymentId,
+      'razorpay_signature': razorpaySignature,
+    });
+    return Map<String, dynamic>.from(response as Map);
+  }
+
+  /// Resolve a text address to coordinates. Public.
+  static Future<Map<String, dynamic>> geocodeAddress(String address) async {
+    final response = await get('/geocode', queryParams: {'address': address});
+    return Map<String, dynamic>.from((response as Map)['data'] as Map);
+  }
+
+  /// Resolve coordinates to a human readable address. Public.
+  static Future<Map<String, dynamic>> reverseGeocode(
+      double latitude, double longitude) async {
+    final response = await get('/geocode/reverse', queryParams: {
+      'latitude': latitude.toString(),
+      'longitude': longitude.toString(),
+    });
+    return Map<String, dynamic>.from((response as Map)['data'] as Map);
+  }
+
+  static String _dateStr(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 }
 

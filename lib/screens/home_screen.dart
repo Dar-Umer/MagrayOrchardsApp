@@ -21,6 +21,7 @@ import 'address_screen.dart';
 import 'wishlist_screen.dart';
 import 'subscription_screen.dart';
 import 'wallet_screen.dart';
+import 'my_bookings_screen.dart';
 import '../widgets/pro_member_badge.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1630,6 +1631,16 @@ class _ProfileTab extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const OrdersScreen()),
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.calendar_month, color: primary),
+            title: const Text('My Bookings'),
+            subtitle: const Text('Service visits & payments'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
             ),
           ),
           ListTile(

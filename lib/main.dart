@@ -19,6 +19,7 @@ import 'screens/address_screen.dart';
 import 'screens/wishlist_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/wallet_screen.dart';
+import 'screens/my_bookings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,7 @@ class MagrayOrchardsApp extends StatelessWidget {
               '/wishlist': (_) => const WishlistScreen(),
               '/checkout': (_) => const CheckoutScreen(),
               '/wallet': (_) => const WalletScreen(),
+              '/bookings': (_) => const MyBookingsScreen(),
             },
           );
         },
