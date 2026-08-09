@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_network_image.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
@@ -135,6 +136,47 @@ class _HomeTabState extends State<_HomeTab> {
     }
   }
 
+  Future<void> _openPromoLink(BuildContext context) async {
+    final link = ShopConfig.promoBannerLink;
+    if (link.isNotEmpty) {
+      if (link.startsWith('http://') || link.startsWith('https://')) {
+        final uri = Uri.parse(link);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } else if (link.startsWith('/')) {
+        // Internal app route, e.g. /products
+        switch (link) {
+          case '/products':
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const ProductSearchScreen()),
+              );
+            }
+            return;
+          case '/services':
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const _ServicesTab()),
+              );
+            }
+            return;
+        }
+      }
+    }
+    // Default: open product search
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProductSearchScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
@@ -159,9 +201,22 @@ class _HomeTabState extends State<_HomeTab> {
             pinned: true,
             floating: true,
             backgroundColor: Theme.of(context).colorScheme.surface,
-            title: Text('Magray Orchards',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, color: primary)),
+            title: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Magray Orchards',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: primary)),
+                    if (auth.user?.isProMember == true) ...[
+                      const SizedBox(width: 8),
+                      const ProMemberBadge(isProMember: true, compact: true),
+                    ],
+                  ],
+                );
+              },
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.search),
@@ -292,20 +347,112 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 3. Trust Badges ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  _TrustBadge(icon: Icons.local_shipping_outlined, label: 'Free\nShipping'),
-                  _TrustBadge(icon: Icons.lock_outline, label: 'Secure\nPayment'),
-                  _TrustBadge(icon: Icons.replay_outlined, label: 'Easy\nReturns'),
-                  _TrustBadge(icon: Icons.headset_mic_outlined, label: '24/7\nSupport'),
-                ],
-              ),
-            ),
+          // ── 3. Subscription / Pro Membership (hidden for pro members) ──
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) {
+              final user = auth.user;
+              if (user?.isProMember == true) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              final isPro = user?.isProMember == true;
+              final planName = user?.currentPlan;
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isPro
+                            ? [primaryDark, primary]
+                            : [const Color(0xFF6D28D9), const Color(0xFF8B5CF6)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.workspace_premium,
+                                  color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isPro
+                                        ? '${planName ?? 'Pro'} Member'
+                                        : 'Go Pro with Magray Orchards',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isPro
+                                        ? 'You\'re enjoying premium perks'
+                                        : 'Free delivery, fast support & premium content',
+                                    style: TextStyle(
+                                        color: Colors.white.withValues(
+                                            alpha: 0.85),
+                                        fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (!auth.isLoggedIn) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const LoginScreen()),
+                                );
+                                return;
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SubscriptionScreen()),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: primaryDark,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: Text(isPro
+                                ? 'Manage Subscription'
+                                : 'Explore Plans'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
 
           // ── 4. Shop by Category ──
@@ -433,86 +580,93 @@ class _HomeTabState extends State<_HomeTab> {
           ),
 
           // ── 6. Offer Promo Banner ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.amber, Colors.orange, Colors.red],
+          if (ShopConfig.promoBannerEnabled) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(
+                                ShopConfig.promoBannerColor,
+                                Colors.black,
+                                0.15) ??
+                            ShopConfig.promoBannerColor,
+                        ShopConfig.promoBannerColor,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.4)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.local_fire_department,
-                              color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text('Limited Time Offer',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      ShopConfig.announcementMessage,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Grab the best deals on premium farming essentials before they\'re gone.',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 13),
-                    ),
-                    const SizedBox(height: 14),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const ProductSearchScreen()),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.4)),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: primary,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.local_fire_department,
+                                color: Colors.white, size: 14),
+                            SizedBox(width: 4),
+                            Text('Limited Time Offer',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)),
+                          ],
                         ),
-                        child: const Text('Shop Offers'),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        ShopConfig.promoBannerTitle,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (ShopConfig.promoBannerSubtitle.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          ShopConfig.promoBannerSubtitle,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 13),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton(
+                          onPressed: () => _openPromoLink(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: ShopConfig.promoBannerColor,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Shop Offers'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
 
           // ── 7. Featured Products ──
           const SliverToBoxAdapter(
@@ -1056,38 +1210,6 @@ class _HomeTabState extends State<_HomeTab> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-// TRUST BADGE WIDGET
-// ─────────────────────────────────────────────
-class _TrustBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _TrustBadge({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Column(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: primary, size: 24),
-        ),
-        const SizedBox(height: 4),
-        Text(label,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center),
-      ],
     );
   }
 }
