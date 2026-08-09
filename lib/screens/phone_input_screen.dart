@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/shop_config.dart';
 import 'otp_verify_screen.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
@@ -21,7 +22,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isRegister = false;
-  bool _passwordLogin = false;
+  late bool _passwordLogin = !ShopConfig.otpVerificationEnabled;
   String? _error;
 
   @override
@@ -56,26 +57,45 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
     final phone = _cleanPhone(_phoneController.text.trim());
     try {
       if (_isRegister) {
-        await auth.sendOtp(
-          phone,
-          type: 'register',
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const OtpVerifyScreen()),
+        if (ShopConfig.otpVerificationEnabled) {
+          await auth.sendOtp(
+            phone,
+            type: 'register',
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
           );
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const OtpVerifyScreen()),
+            );
+          }
+        } else {
+          final success = await auth.register(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            phone: phone,
+            password: _passwordController.text,
+          );
+          if (success && mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
         }
       } else if (_passwordLogin) {
         final success = await auth.loginWithPassword(phone, _passwordController.text);
         if (success && mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
+          if (ShopConfig.otpVerificationEnabled && !auth.isPhoneVerified) {
+            _showVerifyPhonePrompt();
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
         }
       } else {
         await auth.sendOtp(phone, type: 'login');
@@ -88,6 +108,53 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
       }
     } catch (e) {
       setState(() { _error = e is ApiException ? e.message : 'Could not complete the request. Please try again.'; });
+    }
+  }
+
+  Future<void> _showVerifyPhonePrompt() async {
+    final auth = context.read<AuthProvider>();
+    final phone = _cleanPhone(_phoneController.text.trim());
+    final verifyNow = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verify your phone'),
+        content: Text('Secure your account by verifying your mobile number +91 $phone. You can skip this for now.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Skip for now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Verify Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (verifyNow == true && mounted) {
+      try {
+        await auth.sendOtp(phone, type: 'login');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const OtpVerifyScreen()),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
+      }
+    } else if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
     }
   }
 
@@ -228,14 +295,14 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                             : Text(
                                 _isRegister
-                                    ? 'Send OTP'
+                                    ? (ShopConfig.otpVerificationEnabled ? 'Send OTP' : 'Create Account')
                                     : (_passwordLogin ? 'Sign In' : 'Send OTP'),
                                 style: const TextStyle(fontSize: 16, color: Colors.white),
                               ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (!_isRegister) ...[
+                    if (!_isRegister && ShopConfig.otpVerificationEnabled) ...[
                       SegmentedButton<bool>(
                         segments: const [
                           ButtonSegment(value: false, label: Text('OTP')),
@@ -258,7 +325,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                         TextButton(
                           onPressed: () => setState(() {
                             _isRegister = !_isRegister;
-                            _passwordLogin = false;
+                            _passwordLogin = !_isRegister && !ShopConfig.otpVerificationEnabled;
                             _error = null;
                           }),
                           child: Text(_isRegister ? 'Sign In' : 'Create One'),
