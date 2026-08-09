@@ -856,8 +856,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           children: [
             _buildPriceRow('Subtotal', 'Rs. ${subtotal.toStringAsFixed(0)}'),
-            const SizedBox(height: 8),
-            _buildPriceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${tax.toStringAsFixed(0)}'),
+            if (tax > 0) ...[
+              const SizedBox(height: 8),
+              _buildPriceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${tax.toStringAsFixed(0)}'),
+            ],
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
