@@ -66,6 +66,14 @@ class ApiService {
     }
 
     if (response.statusCode == 401) {
+      final body = response.body.isNotEmpty ? json.decode(response.body) : null;
+      final message = _extractMessage(body, '');
+      if (message.isNotEmpty) {
+        throw ApiException(
+          statusCode: 401,
+          message: message,
+        );
+      }
       _onUnauthorized?.call();
       throw ApiException(
         statusCode: 401,
