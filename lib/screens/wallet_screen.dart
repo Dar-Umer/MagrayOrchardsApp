@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/empty_state.dart';
 import '../providers/wallet_provider.dart';
 import '../models/wallet.dart';
 import 'wallet_topup_screen.dart';
@@ -183,19 +184,10 @@ class _WalletScreenState extends State<WalletScreen> {
     }
 
     if (wallet.transactions.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(Icons.receipt_long, size: 48, color: Colors.grey),
-              SizedBox(height: 16),
-              Text('No transactions yet', style: TextStyle(color: Colors.grey, fontSize: 16)),
-              SizedBox(height: 8),
-              Text('Add money to your wallet to get started', style: TextStyle(color: Colors.grey)),
-            ],
-          ),
-        ),
+      return const EmptyState(
+        icon: Icons.receipt_long,
+        title: 'No transactions yet',
+        message: 'Add money to your wallet to get started',
       );
     }
 

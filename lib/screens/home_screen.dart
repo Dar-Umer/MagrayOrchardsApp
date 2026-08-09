@@ -23,6 +23,8 @@ import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'my_bookings_screen.dart';
 import '../widgets/pro_member_badge.dart';
+import '../widgets/section_header.dart';
+import '../widgets/app_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -102,6 +104,7 @@ class _HomeTabState extends State<_HomeTab> {
         pp.fetchCategories();
         pp.fetchServices();
         pp.fetchBanners();
+        pp.fetchOfferProducts();
       }
       _fetchLatest();
     });
@@ -121,18 +124,21 @@ class _HomeTabState extends State<_HomeTab> {
       } else {
         items = [];
       }
-      setState(() {
-        _latestProducts = items.map((p) => Product.fromJson(p)).toList();
-        _loadingLatest = false;
-      });
+      if (mounted) {
+        setState(() {
+          _latestProducts = items.map((p) => Product.fromJson(p)).toList();
+          _loadingLatest = false;
+        });
+      }
     } catch (e) {
-      setState(() => _loadingLatest = false);
+      if (mounted) setState(() => _loadingLatest = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final primaryDark = Theme.of(context).colorScheme.onPrimaryContainer;
     return RefreshIndicator(
       onRefresh: () async {
         final pp = context.read<ProductProvider>();
@@ -141,6 +147,7 @@ class _HomeTabState extends State<_HomeTab> {
           pp.fetchCategories(),
           pp.fetchServices(),
           pp.fetchBanners(),
+          pp.fetchOfferProducts(),
           _fetchLatest(),
         ]);
       },
@@ -154,7 +161,7 @@ class _HomeTabState extends State<_HomeTab> {
             backgroundColor: Theme.of(context).colorScheme.surface,
             title: Text('Magray Orchards',
                 style: TextStyle(
-                    fontWeight: FontWeight.bold, color: primary)),
+                    fontWeight: FontWeight.w700, color: primary)),
             actions: [
               IconButton(
                 icon: const Icon(Icons.search),
@@ -171,19 +178,23 @@ class _HomeTabState extends State<_HomeTab> {
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
-              color: primary,
+              color: primary.withValues(alpha: 0.1),
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.phone_in_talk, color: Colors.white, size: 16),
+                  Icon(Icons.campaign, color: primary, size: 16),
                   const SizedBox(width: 6),
-                  Text(
-                    ShopConfig.announcementMessage,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
+                  Flexible(
+                    child: Text(
+                      ShopConfig.announcementMessage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -298,13 +309,8 @@ class _HomeTabState extends State<_HomeTab> {
           ),
 
           // ── 4. Shop by Category ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text('Shop by Category',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
-            ),
+          const SliverToBoxAdapter(
+            child: SectionHeader(title: 'Shop by Category'),
           ),
           Consumer<ProductProvider>(
             builder: (context, pp, _) {
@@ -377,14 +383,140 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 5. Featured Products ──
+          // ── 5. Today's Offers ──
+          Consumer<ProductProvider>(
+            builder: (context, pp, _) {
+              if (!pp.offerLoading && pp.offerProducts.isEmpty) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              return const SliverToBoxAdapter(
+                child: SectionHeader(title: 'Today\'s Offers'),
+              );
+            },
+          ),
+          Consumer<ProductProvider>(
+            builder: (context, pp, _) {
+              if (pp.offerLoading && pp.offerProducts.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 240,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: 4,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (_, __) =>
+                          SizedBox(width: 160, child: _shimmerCard()),
+                    ),
+                  ),
+                );
+              }
+              if (pp.offerProducts.isEmpty) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              return SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 260,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: pp.offerProducts.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 160,
+                      child: _buildProductCard(context, pp.offerProducts[index]),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ── 6. Offer Promo Banner ──
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: Text('Featured Products',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.amber, Colors.orange, Colors.red],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.local_fire_department,
+                              color: Colors.white, size: 14),
+                          SizedBox(width: 4),
+                          Text('Limited Time Offer',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      ShopConfig.announcementMessage,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Grab the best deals on premium farming essentials before they\'re gone.',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13),
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ProductSearchScreen()),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: primary,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Shop Offers'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+          ),
+
+          // ── 7. Featured Products ──
+          const SliverToBoxAdapter(
+            child: SectionHeader(title: 'Featured Products'),
           ),
           Consumer<ProductProvider>(
             builder: (context, pp, _) {
@@ -458,14 +590,9 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 6. Latest Products ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: Text('Latest Products',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
-            ),
+          // ── 8. Latest Products ──
+          const SliverToBoxAdapter(
+            child: SectionHeader(title: 'Latest Products'),
           ),
           if (_loadingLatest && _latestProducts.isEmpty)
             SliverPadding(
@@ -512,14 +639,9 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
 
-          // ── 7. Our Services ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: Text('Our Services',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
-            ),
+          // ── 9. Our Services ──
+          const SliverToBoxAdapter(
+            child: SectionHeader(title: 'Our Services'),
           ),
           Consumer<ProductProvider>(
             builder: (context, pp, _) {
@@ -550,13 +672,13 @@ class _HomeTabState extends State<_HomeTab> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                             child: Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(12),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Container(
-                                    width: 52,
-                                    height: 52,
+                                    width: 48,
+                                    height: 48,
                                     decoration: BoxDecoration(
                                       color: primary.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
@@ -577,12 +699,12 @@ class _HomeTabState extends State<_HomeTab> {
                                         : Icon(Icons.construction,
                                             color: primary),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 8),
                                   Text(service.name,
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 13),
-                                      maxLines: 2,
+                                          fontSize: 12),
+                                      maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       textAlign: TextAlign.center),
                                   const SizedBox(height: 4),
@@ -591,7 +713,7 @@ class _HomeTabState extends State<_HomeTab> {
                                       style: TextStyle(
                                           color: primary,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 13)),
+                                          fontSize: 12)),
                                 ],
                               ),
                             ),
@@ -605,14 +727,9 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 8. How It Works ──
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: Text('How It Works',
-                  style: TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold, color: primary)),
-            ),
+          // ── 10. How It Works ──
+          const SliverToBoxAdapter(
+            child: SectionHeader(title: 'How It Works'),
           ),
           SliverToBoxAdapter(
             child: SizedBox(
@@ -644,7 +761,7 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // ── 9. CTA Banner ──
+          // ── 11. CTA Banner ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -653,21 +770,24 @@ class _HomeTabState extends State<_HomeTab> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
                       primary,
-                      primary.withValues(alpha: 0.7),
+                      primaryDark,
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
                       'Ready to Transform Your Orchard?',
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 20,
-                          fontWeight: FontWeight.bold),
+                          fontWeight: FontWeight.w700),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
@@ -682,42 +802,46 @@ class _HomeTabState extends State<_HomeTab> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            final pp = context.read<ProductProvider>();
-                            if (pp.products.isNotEmpty) {
-                              Scrollable.ensureVisible(
-                                context,
-                                duration: const Duration(milliseconds: 500),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: primary,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final pp = context.read<ProductProvider>();
+                              if (pp.products.isNotEmpty) {
+                                Scrollable.ensureVisible(
+                                  context,
+                                  duration: const Duration(milliseconds: 500),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: primary,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Shop Now'),
                           ),
-                          child: const Text('Shop Now'),
                         ),
                         const SizedBox(width: 12),
-                        OutlinedButton(
-                          onPressed: () {
-                            final pp = context.read<ProductProvider>();
-                            if (pp.services.isNotEmpty) {
-                              Scrollable.ensureVisible(
-                                context,
-                                duration: const Duration(milliseconds: 500),
-                              );
-                            }
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              final pp = context.read<ProductProvider>();
+                              if (pp.services.isNotEmpty) {
+                                Scrollable.ensureVisible(
+                                  context,
+                                  duration: const Duration(milliseconds: 500),
+                                );
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Explore Services'),
                           ),
-                          child: const Text('Explore Services'),
                         ),
                       ],
                     ),
@@ -993,12 +1117,13 @@ class _HowItWorksCard extends StatelessWidget {
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: primary,
                   shape: BoxShape.circle,
@@ -1008,21 +1133,23 @@ class _HowItWorksCard extends StatelessWidget {
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16)),
+                          fontSize: 15)),
                 ),
               ),
-              const SizedBox(height: 10),
-              Icon(icon, color: primary, size: 28),
               const SizedBox(height: 8),
+              Icon(icon, color: primary, size: 24),
+              const SizedBox(height: 6),
               Text(title,
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13),
+                      fontWeight: FontWeight.bold, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(desc,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis),
             ],
           ),
@@ -1605,70 +1732,85 @@ class _ProfileTab extends StatelessWidget {
           Text(user?.email ?? '',
               style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 24),
-          ListTile(
-            leading: Icon(Icons.edit, color: primary),
-            title: const Text('Edit Profile'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const EditProfileScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.workspace_premium, color: primary),
-            title: const Text('My Subscription'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.shopping_bag, color: primary),
-            title: const Text('My Orders'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const OrdersScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.calendar_month, color: primary),
-            title: const Text('My Bookings'),
-            subtitle: const Text('Service visits & payments'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.account_balance_wallet, color: primary),
-            title: const Text('My Wallet'),
-            subtitle: const Text('View balance & transactions'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WalletScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.location_on, color: primary),
-            title: const Text('Addresses'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddressScreen()),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.favorite, color: primary),
-            title: const Text('Wishlist'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WishlistScreen()),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.edit, color: primary),
+                  title: const Text('Edit Profile'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const EditProfileScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.workspace_premium, color: primary),
+                  title: const Text('My Subscription'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SubscriptionScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.shopping_bag, color: primary),
+                  title: const Text('My Orders'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.calendar_month, color: primary),
+                  title: const Text('My Bookings'),
+                  subtitle: const Text('Service visits & payments'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MyBookingsScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.account_balance_wallet, color: primary),
+                  title: const Text('My Wallet'),
+                  subtitle: const Text('View balance & transactions'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WalletScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.location_on, color: primary),
+                  title: const Text('Addresses'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddressScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.favorite, color: primary),
+                  title: const Text('Wishlist'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WishlistScreen()),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

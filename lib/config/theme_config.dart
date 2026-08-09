@@ -92,94 +92,226 @@ class ThemeConfig {
     final primaryDark = colors[700]!;
     final primaryLight = colors[100]!;
 
+    const surface = Color(0xFFF7F8FA);
+    const surfaceCard = Colors.white;
+    const textPrimary = Color(0xFF111827);
+    const textSecondary = Color(0xFF6B7280);
+    const borderSubtle = Color(0xFFECEDF0);
+
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.light,
+      primary: primary,
+      onPrimary: Colors.white,
+      primaryContainer: primaryLight,
+      onPrimaryContainer: primaryDark,
+      secondary: primary,
+      surface: surface,
+      onSurface: textPrimary,
+      outline: borderSubtle,
+    );
+
+    final baseText = TextStyle(fontFamily: fontFamily, color: textPrimary);
+
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
-        brightness: Brightness.light,
-        primary: primary,
-        onPrimary: Colors.white,
-        primaryContainer: primaryLight,
-        onPrimaryContainer: primaryDark,
-        secondary: primary,
-        surface: Colors.white,
-        onSurface: const Color(0xFF1a1a1a),
-      ),
-      scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+      colorScheme: scheme,
+      scaffoldBackgroundColor: surface,
       fontFamily: fontFamily,
+      textTheme: TextTheme(
+        displaySmall: baseText.copyWith(fontSize: 34, fontWeight: FontWeight.w700, height: 1.15),
+        headlineLarge: baseText.copyWith(fontSize: 28, fontWeight: FontWeight.w700, height: 1.2),
+        headlineMedium: baseText.copyWith(fontSize: 22, fontWeight: FontWeight.w700, height: 1.25),
+        headlineSmall: baseText.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+        titleLarge: baseText.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+        titleMedium: baseText.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
+        titleSmall: baseText.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+        bodyLarge: baseText.copyWith(fontSize: 16, height: 1.45),
+        bodyMedium: baseText.copyWith(fontSize: 14, height: 1.4, color: textSecondary),
+        bodySmall: baseText.copyWith(fontSize: 12, color: textSecondary),
+        labelLarge: baseText.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
       appBarTheme: AppBarTheme(
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
+        backgroundColor: surfaceCard,
+        foregroundColor: textPrimary,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
+        shadowColor: Colors.black.withValues(alpha: 0.05),
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontFamily: fontFamily,
           fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
         ),
+        iconTheme: const IconThemeData(color: textPrimary, size: 22),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surfaceCard,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 66,
+        indicatorColor: primaryLight,
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontFamily: fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          return IconThemeData(
+            color: states.contains(WidgetState.selected) ? primary : textSecondary,
+          );
+        }),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: surfaceCard,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: 0.06),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: borderSubtle),
+        ),
+        margin: EdgeInsets.zero,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
           elevation: 0,
+          shadowColor: Colors.transparent,
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
-          side: BorderSide(color: primary),
+          side: const BorderSide(color: borderSubtle, width: 1.5),
+          minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade100),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: primary,
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
         ),
-        color: Colors.white,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: surface,
+        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.8), fontFamily: fontFamily),
+        labelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily),
+        prefixIconColor: textSecondary,
+        suffixIconColor: textSecondary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: borderSubtle),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: borderSubtle),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: primary, width: 1.6),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.6),
+        ),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        selectedItemColor: primary,
-        unselectedItemColor: Colors.grey.shade500,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        elevation: 8,
+      chipTheme: ChipThemeData(
+        backgroundColor: surface,
+        selectedColor: primaryLight,
+        labelStyle: TextStyle(color: primaryDark, fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 12),
+        secondaryLabelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily, fontSize: 12),
+        side: const BorderSide(color: borderSubtle),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      ),
+      dividerTheme: DividerThemeData(
+        color: borderSubtle,
+        thickness: 1,
+        space: 1,
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        iconColor: textSecondary,
+        textColor: textPrimary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: surfaceCard,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        showDragHandle: true,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surfaceCard,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        backgroundColor: textPrimary,
+        contentTextStyle: TextStyle(fontFamily: fontFamily, fontSize: 14, color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      chipTheme: ChipThemeData(
-        backgroundColor: primaryLight,
-        labelStyle: TextStyle(color: primaryDark, fontFamily: fontFamily),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: primary,
+        linearTrackColor: primaryLight.withValues(alpha: 0.4),
+        circularTrackColor: primaryLight.withValues(alpha: 0.4),
       ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
+      tabBarTheme: TabBarThemeData(
+        labelColor: primary,
+        unselectedLabelColor: textSecondary,
+        indicatorColor: primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14),
+        unselectedLabelStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500, fontSize: 14),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? Colors.white : textSecondary),
+        trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? primary : borderSubtle),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? primary : Colors.transparent),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
     );
   }
 

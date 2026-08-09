@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/empty_state.dart';
 import '../config/api_config.dart';
 import '../models/service_booking.dart';
 import '../providers/auth_provider.dart';
@@ -199,20 +200,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
 
     if (_bookings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.calendar_month_outlined,
-                size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            const Text('No bookings yet',
-                style: TextStyle(fontSize: 18, color: Colors.grey)),
-            const SizedBox(height: 8),
-            const Text('Book a service to see it here',
-                style: TextStyle(color: Colors.grey)),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.calendar_month_outlined,
+        title: 'No bookings yet',
+        message: 'Book a service to see it here',
       );
     }
 

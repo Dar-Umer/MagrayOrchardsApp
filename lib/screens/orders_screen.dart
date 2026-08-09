@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/empty_state.dart';
 import '../config/api_config.dart';
 import '../models/order.dart';
 import '../models/product.dart';
@@ -133,19 +134,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
             return Center(child: CircularProgressIndicator(color: cs.primary));
           }
           if (provider.orders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  const Text('No orders yet',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
-                  const SizedBox(height: 8),
-                  const Text('Start shopping to see your orders here',
-                      style: TextStyle(color: Colors.grey)),
-                ],
-              ),
+            return const EmptyState(
+              icon: Icons.shopping_bag_outlined,
+              title: 'No orders yet',
+              message: 'Start shopping to see your orders here',
             );
           }
 
@@ -160,16 +152,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 if (filtered.isEmpty && provider.orders.isNotEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 12),
-                          Text('No orders match your filters',
-                              style: TextStyle(color: Colors.grey[600])),
-                        ],
-                      ),
+                    child: const EmptyState(
+                      icon: Icons.search_off,
+                      title: 'No orders match your filters',
+                      message: 'Try a different search or status',
                     ),
                   )
                 else

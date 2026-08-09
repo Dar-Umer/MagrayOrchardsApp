@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 class ProductProvider extends ChangeNotifier {
   List<Product> _products = [];
   List<Product> _featuredProducts = [];
+  List<Product> _offerProducts = [];
   List<Product> _categoryProducts = [];
   List<Product> _searchProducts = [];
   List<Category> _categories = [];
@@ -18,11 +19,13 @@ class ProductProvider extends ChangeNotifier {
   bool _hasMore = true;
 
   bool _featuredLoading = false;
+  bool _offerLoading = false;
   bool _categoryLoading = false;
   bool _searchLoading = false;
 
   List<Product> get products => _products;
   List<Product> get featuredProducts => _featuredProducts;
+  List<Product> get offerProducts => _offerProducts;
   List<Product> get categoryProducts => _categoryProducts;
   List<Product> get searchProducts => _searchProducts;
   List<Category> get categories => _categories;
@@ -30,6 +33,7 @@ class ProductProvider extends ChangeNotifier {
   List<AppBanner> get banners => _banners;
   bool get isLoading => _isLoading;
   bool get featuredLoading => _featuredLoading;
+  bool get offerLoading => _offerLoading;
   bool get categoryLoading => _categoryLoading;
   bool get searchLoading => _searchLoading;
   bool get hasMore => _hasMore;
@@ -117,6 +121,30 @@ class ProductProvider extends ChangeNotifier {
       isFeatured: isFeatured,
       page: _currentPage + 1,
     );
+  }
+
+  Future<void> fetchOfferProducts() async {
+    _offerLoading = true;
+    notifyListeners();
+    try {
+      final response = await ApiService.get('/products',
+          queryParams: {'is_offer': 'true', 'page': '1'});
+      final envelope = response['data'];
+      List<dynamic> items;
+      if (envelope is Map && envelope.containsKey('data')) {
+        items = envelope['data'] ?? [];
+      } else if (envelope is List) {
+        items = envelope;
+      } else {
+        items = [];
+      }
+      _offerProducts = items.map((p) => Product.fromJson(p)).toList();
+    } catch (e) {
+      _errorMessage =
+          e is ApiException ? e.message : 'Could not load offers.';
+    }
+    _offerLoading = false;
+    notifyListeners();
   }
 
   Future<Product?> fetchProductDetail(String slug) async {

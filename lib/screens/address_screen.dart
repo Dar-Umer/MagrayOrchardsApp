@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/empty_state.dart';
 import '../models/address.dart';
 import '../providers/address_provider.dart';
 import '../providers/auth_provider.dart';
@@ -138,27 +139,10 @@ class _AddressScreenState extends State<AddressScreen> {
           }
 
           if (provider.addresses.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.location_off,
-                    size: 80,
-                    color: Colors.grey.shade300,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No addresses saved',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Add a delivery address to get started',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
+            return const EmptyState(
+              icon: Icons.location_off,
+              title: 'No addresses saved',
+              message: 'Add a delivery address to get started',
             );
           }
 

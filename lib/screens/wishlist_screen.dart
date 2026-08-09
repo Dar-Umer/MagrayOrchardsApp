@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/app_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../config/api_config.dart';
@@ -132,27 +133,10 @@ class _WishlistScreenState extends State<WishlistScreen> {
           }
 
           if (provider.items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite_border,
-                    size: 80,
-                    color: Colors.grey.shade300,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Your wishlist is empty',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Save items you love',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
+            return const EmptyState(
+              icon: Icons.favorite_border,
+              title: 'Your wishlist is empty',
+              message: 'Save items you love',
             );
           }
 
