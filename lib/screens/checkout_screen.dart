@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/razorpay_factory.dart';
 import '../services/razorpay_helper.dart';
 import '../services/shop_config.dart';
+import '../services/sound_service.dart';
 import '../providers/wallet_provider.dart';
 import 'home_screen.dart';
 import 'address_screen.dart';
@@ -32,6 +33,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double? _apiShipping;
   bool _freeDelivery = false;
   bool _shippingLoading = false;
+  int? _estimatedDays;
   double _walletBalance = 0;
   bool _walletLoading = false;
 
@@ -118,11 +120,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _apiShipping = _toDouble(data['delivery_charge'] ?? 50);
         _freeDelivery = data['free_delivery'] == true;
+        final days = data['estimated_days'];
+        _estimatedDays = days is num ? days.toInt() : (days is String ? int.tryParse(days) : null);
       });
     } catch (_) {
       setState(() {
         _apiShipping = null;
         _freeDelivery = false;
+        _estimatedDays = null;
       });
     } finally {
       if (mounted) setState(() => _shippingLoading = false);
@@ -432,6 +437,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _showSuccessDialog(String title, String message, {String? orderNumber}) {
     final cs = Theme.of(context).colorScheme;
+    SoundService.playOrderSuccess();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -876,6 +882,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
               ],
             ),
+            if (_estimatedDays != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Estimated Delivery', style: TextStyle(color: Colors.grey)),
+                  Text(
+                    'In ${_estimatedDays} day${_estimatedDays == 1 ? '' : 's'}',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ],
             if (_couponApplied && _couponDiscount > 0) ...[
               const SizedBox(height: 8),
               _buildPriceRow('Coupon Discount', '- Rs. ${_couponDiscount.toStringAsFixed(0)}', isDiscount: true),

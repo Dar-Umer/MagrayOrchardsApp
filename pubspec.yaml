@@ -43,6 +43,7 @@ dependencies:
   razorpay_flutter: ^1.4.0
   url_launcher: ^6.3.1
   geolocator: ^13.0.3
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +66,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/sounds/order_success.wav
 
   # To add assets to your application, add an assets section, like this:
   # assets:
