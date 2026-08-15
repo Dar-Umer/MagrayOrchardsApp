@@ -96,7 +96,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(isEditing ? 'Address updated' : 'Address added'),
-          backgroundColor: const Color(0xFF2E7D32),
+          backgroundColor: Theme.of(context).colorScheme.primary,
         ),
       );
       Navigator.pop(context);
@@ -161,7 +161,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 title: const Text('Set as Default'),
                 value: _isDefault,
                 onChanged: (v) => setState(() => _isDefault = v),
-                activeColor: const Color(0xFF2E7D32),
+                activeColor: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -170,7 +170,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),

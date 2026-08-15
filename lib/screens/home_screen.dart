@@ -26,6 +26,7 @@ import 'my_bookings_screen.dart';
 import '../widgets/pro_member_badge.dart';
 import '../widgets/section_header.dart';
 import '../widgets/app_card.dart';
+import '../widgets/product_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -200,15 +201,18 @@ class _HomeTabState extends State<_HomeTab> {
             expandedHeight: 56,
             pinned: true,
             floating: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: primary,
+            foregroundColor: Colors.white,
             title: Consumer<AuthProvider>(
               builder: (context, auth, _) {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const Icon(Icons.eco, color: Colors.white, size: 22),
+                    const SizedBox(width: 8),
                     Text('Magray Orchards',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, color: primary)),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, color: Colors.white)),
                     if (auth.user?.isProMember == true) ...[
                       const SizedBox(width: 8),
                       const ProMemberBadge(isProMember: true, compact: true),
@@ -219,7 +223,7 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.search),
+                icon: const Icon(Icons.search, color: Colors.white),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -233,12 +237,14 @@ class _HomeTabState extends State<_HomeTab> {
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
-              color: primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.secondaryContainer,
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.campaign, color: primary, size: 16),
+                  Icon(Icons.campaign,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      size: 16),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
@@ -246,7 +252,9 @@ class _HomeTabState extends State<_HomeTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: primary,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer,
                           fontSize: 13,
                           fontWeight: FontWeight.w600),
                     ),
@@ -368,7 +376,7 @@ class _HomeTabState extends State<_HomeTab> {
                         end: Alignment.bottomRight,
                         colors: isPro
                             ? [primaryDark, primary]
-                            : [const Color(0xFF6D28D9), const Color(0xFF8B5CF6)],
+                            : [Theme.of(context).colorScheme.tertiary, primary],
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -571,7 +579,15 @@ class _HomeTabState extends State<_HomeTab> {
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (context, index) => SizedBox(
                       width: 160,
-                      child: _buildProductCard(context, pp.offerProducts[index]),
+                      child: ProductCard(
+                        product: pp.offerProducts[index],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                  product: pp.offerProducts[index])),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -736,7 +752,15 @@ class _HomeTabState extends State<_HomeTab> {
                     itemBuilder: (context, index) =>
                         SizedBox(
                           width: 160,
-                          child: _buildProductCard(context, pp.featuredProducts[index]),
+                          child: ProductCard(
+                            product: pp.featuredProducts[index],
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => ProductDetailScreen(
+                                      product: pp.featuredProducts[index])),
+                            ),
+                          ),
                         ),
                   ),
                 ),
@@ -787,7 +811,15 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) =>
-                      _buildProductCard(context, _latestProducts[index]),
+                      ProductCard(
+                        product: _latestProducts[index],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                  product: _latestProducts[index])),
+                        ),
+                      ),
                   childCount: _latestProducts.length,
                 ),
               ),
@@ -1011,203 +1043,13 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   Widget _shimmerCard() {
+    final theme = Theme.of(context);
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        color: Colors.grey[200],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(BuildContext context, Product product) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final cart = context.read<CartProvider>();
-    final discount = product.discountPercent;
-    final inStock = product.inStock;
-
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailScreen(product: product),
-        ),
-      ),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Image ──
-            Expanded(
-              flex: 4,
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    color: primary.withValues(alpha: 0.05),
-                    child: product.image != null
-                        ? AppNetworkImage(
-                            imageUrl:
-                                '${ApiConfig.imageBaseUrl}${product.image}',
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Center(
-                              child: Icon(Icons.eco,
-                                  size: 40, color: primary),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Icon(Icons.eco,
-                                  size: 40, color: primary),
-                            ),
-                          )
-                        : Center(
-                            child: Icon(Icons.eco,
-                                size: 40, color: primary),
-                          ),
-                  ),
-                  if (discount > 0)
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text('-$discount%',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // ── Info ──
-            Expanded(
-              flex: 5,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(product.name,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 12),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text('Rs. ${product.price.toStringAsFixed(0)}',
-                            style: TextStyle(
-                                color: primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        if (product.comparePrice != null) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            'Rs. ${product.comparePrice!.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              decoration: TextDecoration.lineThrough,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (!inStock)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Text('Out of Stock',
-                            style:
-                                TextStyle(color: Colors.red, fontSize: 11)),
-                      ),
-                    const SizedBox(height: 4),
-                    // ── Buttons ──
-                    if (inStock) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        height: 28,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            cart.clearCart();
-                            cart.addItem(product);
-                            Navigator.pushNamed(context, '/checkout');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primary,
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: const Text('Buy Now',
-                              style: TextStyle(
-                                  color: Colors.white, fontSize: 11)),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 28,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            cart.addItem(product);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Added to cart'),
-                                backgroundColor: primary,
-                                action: SnackBarAction(
-                                  label: 'VIEW CART',
-                                  textColor: Colors.white,
-                                  onPressed: () {
-                                    // Switch to cart tab
-                                    final homeState =
-                                        context.findAncestorStateOfType<
-                                            _HomeScreenState>();
-                                    homeState?.setState(
-                                        () => homeState._currentIndex = 3);
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            side: BorderSide(color: primary),
-                            foregroundColor: primary,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: const Text('Add to Cart',
-                              style: TextStyle(fontSize: 11)),
-                        ),
-                      ),
-                    ] else
-                      SizedBox(
-                        width: double.infinity,
-                        height: 28,
-                        child: OutlinedButton(
-                          onPressed: null,
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: const Text('Out of Stock',
-                              style: TextStyle(fontSize: 11)),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
     );

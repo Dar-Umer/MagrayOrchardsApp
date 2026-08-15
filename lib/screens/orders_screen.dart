@@ -273,7 +273,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Order #${order.orderNumber}',
+                        Text('Order ${order.orderNumber}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         const SizedBox(height: 4),
                         Text('${order.items.length} item(s)',

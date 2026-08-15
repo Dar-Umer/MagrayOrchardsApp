@@ -193,7 +193,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Cancellation'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text('Cancel order #${_order.orderNumber}? Refund will be processed to your $refundMethod method.'),
+        content: Text('Cancel order ${_order.orderNumber}? Refund will be processed to your $refundMethod method.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
           ElevatedButton(
@@ -275,7 +275,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text('Order #${_order.orderNumber}')),
+      appBar: AppBar(title: Text('Order ${_order.orderNumber}')),
       body: _loadingDetail
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

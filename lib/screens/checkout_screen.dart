@@ -291,7 +291,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'amount': razorpayAmount,
         'name': 'Magray Orchards',
         'order_id': razorpayOrderId,
-        'description': 'Order #${order.orderNumber}',
+        'description': 'Order ${order.orderNumber}',
         'prefill': {
           'contact': userPhone,
           'email': userEmail,
@@ -360,7 +360,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'amount': (remaining * 100).toInt(),
           'name': 'Magray Orchards',
           'order_id': razorpayOrderId,
-          'description': 'Order #${order.orderNumber} (₹${walletBalance.toStringAsFixed(0)} from wallet)',
+          'description': 'Order ${order.orderNumber} (₹${walletBalance.toStringAsFixed(0)} from wallet)',
           'prefill': {
             'contact': userPhone,
             'email': userEmail,
@@ -452,7 +452,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'Order #$orderNumber',
+                  'Order $orderNumber',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: cs.primary),
                 ),
               ),
@@ -999,7 +999,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: ElevatedButton(
         onPressed: _placingOrder ? null : _placeOrder,
         style: ElevatedButton.styleFrom(
-          backgroundColor: cs.primary,
+          backgroundColor: cs.secondary,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: _placingOrder

@@ -235,18 +235,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildPriceRow(ThemeData theme) {
+    final gold = Theme.of(context).colorScheme.secondary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text('Rs. ${_currentPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+        Text('Rs. ${_currentPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
         if (_currentComparePrice != null && _currentComparePrice! > _currentPrice) ...[
           const SizedBox(width: 10),
           Text('Rs. ${_currentComparePrice!.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, color: Colors.grey.shade500, decoration: TextDecoration.lineThrough)),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
-            child: Text('$_discountPercent% OFF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+            decoration: BoxDecoration(color: gold, borderRadius: BorderRadius.circular(6)),
+            child: Text('$_discountPercent% OFF', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
           ),
         ],
       ],
@@ -254,6 +255,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildVariantSelector(ThemeData theme) {
+    final gold = Theme.of(context).colorScheme.secondary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -270,18 +272,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: selected ? theme.colorScheme.primaryContainer : Colors.white,
+                  color: selected ? gold : Colors.white,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: selected ? theme.colorScheme.primary : Colors.grey.shade300,
+                    color: selected ? gold : Colors.grey.shade300,
                     width: selected ? 2 : 1,
                   ),
                 ),
                 child: Column(
                   children: [
-                    Text(v.name, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? theme.colorScheme.primary : Colors.black87, fontSize: 14)),
+                    Text(v.name, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? Colors.white : Colors.black87, fontSize: 14)),
                     if (discount > 0)
-                      Text('$discount% off', style: TextStyle(fontSize: 11, color: Colors.green.shade600, fontWeight: FontWeight.w500)),
+                      Text('$discount% off', style: TextStyle(fontSize: 11, color: selected ? Colors.white : Colors.green.shade600, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -586,7 +588,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: ElevatedButton(
                 onPressed: _buyNow,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: const Text('Buy Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

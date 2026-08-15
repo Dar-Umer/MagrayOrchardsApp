@@ -83,32 +83,58 @@ class ThemeConfig {
     );
   }
 
+  // ── Premium "Rich & Premium" tokens ──────────────────────────────────────
+  // Deep forest green primary, gold accent, warm ivory surfaces.
+  static const Color premiumGreen = Color(0xFF1B4332);
+  static const Color premiumGreenDeep = Color(0xFF143226);
+  static const Color premiumGreenSoft = Color(0xFFE4EDE7);
+  static const Color premiumGold = Color(0xFFC9A227);
+  static const Color premiumGoldDeep = Color(0xFFB8860B);
+  static const Color premiumGoldSoft = Color(0xFFF7EEDC);
+  static const Color premiumIvory = Color(0xFFFBFAF7);
+  static const Color premiumCard = Color(0xFFFFFFFF);
+  static const Color premiumText = Color(0xFF1F2421);
+  static const Color premiumTaupe = Color(0xFF6B6B5E);
+  static const Color premiumBorder = Color(0xFFE8E6DF);
+
   static ThemeData buildThemeData({
     String paletteName = 'emerald',
     String fontFamily = 'Inter',
   }) {
     final colors = getPaletteColors(paletteName);
-    final primary = colors[600]!;
-    final primaryDark = colors[700]!;
-    final primaryLight = colors[100]!;
+    // Deep premium color derived from the admin-selected palette (800 shade for
+    // depth), with a brighter palette-derived accent instead of a fixed gold,
+    // so the whole app reflects the admin's brand colour.
+    final primary = colors[800]!;
+    final primaryDark = colors[900]!;
+    final primarySoft = colors[100]!;
+    final accent = colors[600]!;
+    final accentSoft = colors[50]!;
 
-    const surface = Color(0xFFF7F8FA);
-    const surfaceCard = Colors.white;
-    const textPrimary = Color(0xFF111827);
-    const textSecondary = Color(0xFF6B7280);
-    const borderSubtle = Color(0xFFECEDF0);
+    const surface = premiumIvory;
+    const surfaceCard = premiumCard;
+    const textPrimary = premiumText;
+    const textSecondary = premiumTaupe;
+    const borderSubtle = premiumBorder;
 
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.light,
       primary: primary,
       onPrimary: Colors.white,
-      primaryContainer: primaryLight,
+      primaryContainer: primarySoft,
       onPrimaryContainer: primaryDark,
-      secondary: primary,
+      secondary: accent,
+      onSecondary: Colors.white,
+      secondaryContainer: accentSoft,
+      onSecondaryContainer: primaryDark,
+      tertiary: primaryDark,
       surface: surface,
       onSurface: textPrimary,
+      surfaceContainerLowest: surfaceCard,
+      surfaceContainerLow: surface,
       outline: borderSubtle,
+      outlineVariant: borderSubtle,
     );
 
     final baseText = TextStyle(fontFamily: fontFamily, color: textPrimary);
@@ -119,11 +145,11 @@ class ThemeConfig {
       scaffoldBackgroundColor: surface,
       fontFamily: fontFamily,
       textTheme: TextTheme(
-        displaySmall: baseText.copyWith(fontSize: 34, fontWeight: FontWeight.w700, height: 1.15),
-        headlineLarge: baseText.copyWith(fontSize: 28, fontWeight: FontWeight.w700, height: 1.2),
-        headlineMedium: baseText.copyWith(fontSize: 22, fontWeight: FontWeight.w700, height: 1.25),
+        displaySmall: baseText.copyWith(fontSize: 34, fontWeight: FontWeight.w800, height: 1.12, letterSpacing: -0.5),
+        headlineLarge: baseText.copyWith(fontSize: 28, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -0.5),
+        headlineMedium: baseText.copyWith(fontSize: 22, fontWeight: FontWeight.w700, height: 1.2),
         headlineSmall: baseText.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
-        titleLarge: baseText.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+        titleLarge: baseText.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         titleMedium: baseText.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
         titleSmall: baseText.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
         bodyLarge: baseText.copyWith(fontSize: 16, height: 1.45),
@@ -132,34 +158,36 @@ class ThemeConfig {
         labelLarge: baseText.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: surfaceCard,
-        foregroundColor: textPrimary,
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
-        shadowColor: Colors.black.withValues(alpha: 0.05),
+        scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontFamily: fontFamily,
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: textPrimary,
+          color: Colors.white,
+          letterSpacing: -0.2,
         ),
-        iconTheme: const IconThemeData(color: textPrimary, size: 22),
+        iconTheme: const IconThemeData(color: Colors.white, size: 22),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceCard,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        height: 66,
-        indicatorColor: primaryLight,
-        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.08),
+        height: 68,
+        indicatorColor: accentSoft,
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         labelTextStyle: WidgetStatePropertyAll(
           TextStyle(fontFamily: fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
         ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           return IconThemeData(
-            color: states.contains(WidgetState.selected) ? primary : textSecondary,
+            color: states.contains(WidgetState.selected) ? primaryDark : textSecondary,
+            size: 22,
           );
         }),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
@@ -177,14 +205,14 @@ class ThemeConfig {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: accent,
           foregroundColor: Colors.white,
           elevation: 0,
           shadowColor: Colors.transparent,
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.2),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -194,7 +222,7 @@ class ThemeConfig {
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -215,7 +243,7 @@ class ThemeConfig {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surface,
+        fillColor: surfaceCard,
         hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.8), fontFamily: fontFamily),
         labelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily),
         prefixIconColor: textSecondary,
@@ -231,7 +259,7 @@ class ThemeConfig {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primary, width: 1.6),
+          borderSide: BorderSide(color: accent, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -244,7 +272,7 @@ class ThemeConfig {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: surface,
-        selectedColor: primaryLight,
+        selectedColor: accentSoft,
         labelStyle: TextStyle(color: primaryDark, fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 12),
         secondaryLabelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily, fontSize: 12),
         side: const BorderSide(color: borderSubtle),
@@ -283,13 +311,13 @@ class ThemeConfig {
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: primary,
-        linearTrackColor: primaryLight.withValues(alpha: 0.4),
-        circularTrackColor: primaryLight.withValues(alpha: 0.4),
+        linearTrackColor: primarySoft.withValues(alpha: 0.4),
+        circularTrackColor: primarySoft.withValues(alpha: 0.4),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: primary,
         unselectedLabelColor: textSecondary,
-        indicatorColor: primary,
+        indicatorColor: accent,
         indicatorSize: TabBarIndicatorSize.label,
         labelStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14),
         unselectedLabelStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w500, fontSize: 14),
@@ -306,14 +334,28 @@ class ThemeConfig {
             states.contains(WidgetState.selected) ? primary : Colors.transparent),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? primary : textSecondary),
+      ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: primary,
+        backgroundColor: accent,
         foregroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
+
+  // Convenience accessors used by screens (single source of truth).
+  static Color get gold => premiumGold;
+  static Color get goldDeep => premiumGoldDeep;
+  static Color get goldSoft => premiumGoldSoft;
+  static Color get green => premiumGreen;
+  static Color get greenDeep => premiumGreenDeep;
+  static Color get ivory => premiumIvory;
+  static Color get taupe => premiumTaupe;
+  static Color get border => premiumBorder;
 
   static Color color50(String paletteName) => getPaletteColors(paletteName)[50]!;
   static Color color100(String paletteName) => getPaletteColors(paletteName)[100]!;

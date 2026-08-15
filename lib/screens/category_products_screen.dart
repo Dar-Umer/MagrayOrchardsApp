@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../widgets/app_network_image.dart';
 import 'package:shimmer/shimmer.dart';
-import '../config/api_config.dart';
-import '../models/product.dart';
 import '../providers/product_provider.dart';
+import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
 
 class CategoryProductsScreen extends StatefulWidget {
@@ -35,11 +33,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.categoryName),
-        backgroundColor: const Color(0xFF2E7D32),
-        foregroundColor: Colors.white,
       ),
       body: Consumer<ProductProvider>(
         builder: (context, provider, child) {
@@ -52,7 +49,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           }
 
           return RefreshIndicator(
-            color: const Color(0xFF2E7D32),
+            color: primary,
             onRefresh: () => provider.fetchProducts(
               categoryId: widget.categoryId,
               page: 1,
@@ -70,118 +67,27 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                 padding: const EdgeInsets.all(12),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 0.68,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
                 itemCount: provider.products.length,
                 itemBuilder: (context, index) {
-                  return _buildProductCard(context, provider.products[index]);
+                  final product = provider.products[index];
+                  return ProductCard(
+                    product: product,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              ProductDetailScreen(product: product)),
+                    ),
+                  );
                 },
               ),
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildProductCard(BuildContext context, Product product) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: product),
-          ),
-        );
-      },
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 2,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                color: Colors.green[50],
-                child: product.image != null
-                    ? AppNetworkImage(
-                        imageUrl: '${ApiConfig.imageBaseUrl}${product.image}',
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: Icon(Icons.eco, size: 40, color: Color(0xFF2E7D32)),
-                        ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.eco, size: 40, color: Color(0xFF2E7D32)),
-                        ),
-                      )
-                    : const Center(
-                        child: Icon(Icons.eco, size: 40, color: Color(0xFF2E7D32)),
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        'Rs. ${product.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          color: Color(0xFF2E7D32),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (product.comparePrice != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          'Rs. ${product.comparePrice!.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            decoration: TextDecoration.lineThrough,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: product.stockQuantity > 0
-                          ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
-                          : Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      product.stockQuantity > 0 ? 'In Stock' : 'Out of Stock',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: product.stockQuantity > 0
-                            ? const Color(0xFF2E7D32)
-                            : Colors.red,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
