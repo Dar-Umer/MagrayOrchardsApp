@@ -12,6 +12,7 @@ import '../widgets/star_rating.dart';
 import '../widgets/review_card.dart';
 import '../widgets/write_review_form.dart';
 import 'product_image_gallery.dart';
+import 'category_products_screen.dart';
 import 'checkout_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -239,10 +240,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           Text(_p.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
-          if (_p.categoryName != null)
+          if (_p.categoryName != null && _p.categoryId != null)
             GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Text(_p.categoryName!, style: TextStyle(color: theme.colorScheme.primary, fontSize: 14)),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CategoryProductsScreen(
+                    categoryId: _p.categoryId!,
+                    categoryName: _p.categoryName!,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_p.categoryName!, style: TextStyle(color: theme.colorScheme.primary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.primary),
+                ],
+              ),
             ),
           const SizedBox(height: 8),
           if (_p.reviews.isNotEmpty)
@@ -260,22 +276,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
+                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.science, size: 16, color: Colors.blue.shade700),
+                      Icon(Icons.science, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 6),
-                      Text('Composition', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue.shade700, fontSize: 13)),
+                      Text('Composition', style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.primary, fontSize: 13)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(_p.composition!, style: TextStyle(color: Colors.blue.shade900, fontSize: 14)),
+                  Text(_p.composition!, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14)),
                 ],
               ),
             ),

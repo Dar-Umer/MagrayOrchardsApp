@@ -7,7 +7,7 @@ class RegisterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PhoneInputScreen()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PhoneInputScreen(initialRegister: true)));
     });
     return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }

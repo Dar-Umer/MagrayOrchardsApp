@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/address.dart';
 import '../providers/address_provider.dart';
+import '../services/api_service.dart';
 
 class AddressFormScreen extends StatefulWidget {
   final Address? address;
@@ -18,12 +19,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   late final TextEditingController _phoneController;
   late final TextEditingController _line1Controller;
   late final TextEditingController _line2Controller;
+  late final TextEditingController _pincodeController;
   late final TextEditingController _cityController;
   late final TextEditingController _stateController;
-  late final TextEditingController _pincodeController;
   late final TextEditingController _countryController;
   bool _isDefault = false;
   bool _isSaving = false;
+  bool _isPincodeLoading = false;
 
   bool get isEditing => widget.address != null;
 
@@ -35,24 +37,59 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _phoneController = TextEditingController(text: a?.phone ?? '');
     _line1Controller = TextEditingController(text: a?.addressLine1 ?? '');
     _line2Controller = TextEditingController(text: a?.addressLine2 ?? '');
+    _pincodeController = TextEditingController(text: a?.pincode ?? '');
     _cityController = TextEditingController(text: a?.city ?? '');
     _stateController = TextEditingController(text: a?.state ?? '');
-    _pincodeController = TextEditingController(text: a?.pincode ?? '');
     _countryController = TextEditingController(text: a?.country ?? 'India');
     _isDefault = a?.isDefault ?? false;
+    _pincodeController.addListener(_onPincodeChanged);
   }
 
   @override
   void dispose() {
+    _pincodeController.removeListener(_onPincodeChanged);
     _nameController.dispose();
     _phoneController.dispose();
     _line1Controller.dispose();
     _line2Controller.dispose();
+    _pincodeController.dispose();
     _cityController.dispose();
     _stateController.dispose();
-    _pincodeController.dispose();
     _countryController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onPincodeChanged() async {
+    final pin = _pincodeController.text.trim();
+    if (pin.length != 6) return;
+    if (_isPincodeLoading) return;
+    setState(() => _isPincodeLoading = true);
+    try {
+      final data = await ApiService.fetchPincodeDetails(pin);
+      if (!mounted) return;
+      final city = data['city'];
+      final state = data['state'];
+      final serviceable = data['is_serviceable'] == true;
+      setState(() {
+        if (city is String && city.isNotEmpty) _cityController.text = city;
+        if (state is String && state.isNotEmpty) _stateController.text = state;
+        if (_countryController.text.trim().isEmpty) {
+          _countryController.text = 'India';
+        }
+        _isPincodeLoading = false;
+        if (!serviceable && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Delivery is not available for this pincode'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isPincodeLoading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -133,6 +170,20 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                   _line2Controller, 'Address Line 2 (Optional)', Icons.home,
                   required: false),
               const SizedBox(height: 12),
+              _buildField(
+                  _pincodeController, 'Pincode', Icons.pin_drop_outlined,
+                  keyboardType: TextInputType.number,
+                  suffixIcon: _isPincodeLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -145,17 +196,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                      child: _buildField(
-                          _pincodeController, 'Pincode', Icons.pin_drop_outlined,
-                          keyboardType: TextInputType.number)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: _buildField(_countryController, 'Country', Icons.flag)),
-                ],
-              ),
+              _buildField(_countryController, 'Country', Icons.flag),
               const SizedBox(height: 12),
               SwitchListTile(
                 title: const Text('Set as Default'),
@@ -194,6 +235,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     IconData icon, {
     TextInputType? keyboardType,
     bool required = true,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -201,6 +243,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
+        suffixIcon: suffixIcon,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: required

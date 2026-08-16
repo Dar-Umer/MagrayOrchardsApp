@@ -95,8 +95,9 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                 const SizedBox(width: 12),
                 // Main image (smaller)
                 Expanded(
-                  child: SizedBox(
+                  child: Container(
                     height: 360,
+                    color: Colors.white,
                     child: Stack(
                       children: [
                         PageView.builder(
@@ -110,8 +111,8 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                                 imageUrl: _imageUrl(widget.imageUrls[i]),
                                 fit: BoxFit.contain,
                                 width: double.infinity,
-                                placeholder: (_, __) => Container(color: Colors.grey.shade100, child: const Center(child: CircularProgressIndicator())),
-                                errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                                placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
+                                errorWidget: (_, __, ___) => Container(color: Colors.white, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
                               ),
                             );
                           },
@@ -133,22 +134,25 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
               height: 320,
               child: Stack(
                 children: [
-                  PageView.builder(
-                    controller: _pageController,
-                    itemCount: widget.imageUrls.length,
-                    onPageChanged: (i) => setState(() => _currentIndex = i),
-                    itemBuilder: (context, i) {
-                      return GestureDetector(
-                        onTap: () => _showFullScreen(i),
-                        child: AppNetworkImage(
-                          imageUrl: _imageUrl(widget.imageUrls[i]),
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          placeholder: (_, __) => Container(color: Colors.grey.shade100, child: const Center(child: CircularProgressIndicator())),
-                          errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
-                        ),
-                      );
-                    },
+                  Container(
+                    color: Colors.white,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: widget.imageUrls.length,
+                      onPageChanged: (i) => setState(() => _currentIndex = i),
+                      itemBuilder: (context, i) {
+                        return GestureDetector(
+                          onTap: () => _showFullScreen(i),
+                          child: AppNetworkImage(
+                            imageUrl: _imageUrl(widget.imageUrls[i]),
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
+                            errorWidget: (_, __, ___) => Container(color: Colors.white, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                   if (widget.imageUrls.length > 1)
                     Positioned(
@@ -163,7 +167,7 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                             height: 8,
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             decoration: BoxDecoration(
-                              color: _currentIndex == i ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.7),
+                              color: _currentIndex == i ? Theme.of(context).colorScheme.primary : Colors.grey.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           );

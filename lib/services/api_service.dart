@@ -45,15 +45,16 @@ class ApiService {
 
   static String _extractMessage(dynamic body, String fallback) {
     if (body is Map) {
-      if (body['message'] is String && (body['message'] as String).isNotEmpty) {
-        return body['message'] as String;
-      }
+      // Prefer specific field errors (e.g. "The email has already been taken.")
       if (body['errors'] is Map) {
         final errors = body['errors'] as Map;
         final first = errors.values.first;
         if (first is List && first.isNotEmpty) {
           return first.first.toString();
         }
+      }
+      if (body['message'] is String && (body['message'] as String).isNotEmpty) {
+        return body['message'] as String;
       }
     }
     return fallback;
@@ -314,6 +315,12 @@ class ApiService {
       'items': items,
       'subtotal': subtotal,
     });
+    return Map<String, dynamic>.from(response['data'] ?? response);
+  }
+
+  /// Look up city/state details for a pincode. Public.
+  static Future<Map<String, dynamic>> fetchPincodeDetails(String pincode) async {
+    final response = await get('/pincodes/$pincode/check');
     return Map<String, dynamic>.from(response['data'] ?? response);
   }
 

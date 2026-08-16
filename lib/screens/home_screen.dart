@@ -431,11 +431,11 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 3. Subscription / Pro Membership (hidden for pro members) ──
+          // ── 3. Subscription / Pro Membership (hidden for guests and pro members) ──
           Consumer<AuthProvider>(
             builder: (context, auth, _) {
               final user = auth.user;
-              if (user?.isProMember == true) {
+              if (!auth.isLoggedIn || user?.isProMember == true) {
                 return const SliverToBoxAdapter(child: SizedBox.shrink());
               }
               final isPro = user?.isProMember == true;

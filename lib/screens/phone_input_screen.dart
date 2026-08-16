@@ -9,7 +9,9 @@ import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 
 class PhoneInputScreen extends StatefulWidget {
-  const PhoneInputScreen({super.key});
+  const PhoneInputScreen({super.key, this.initialRegister = false});
+
+  final bool initialRegister;
 
   @override
   State<PhoneInputScreen> createState() => _PhoneInputScreenState();
@@ -21,7 +23,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isRegister = false;
+  late bool _isRegister = widget.initialRegister;
   late bool _passwordLogin = !ShopConfig.otpVerificationEnabled;
   String? _error;
 
