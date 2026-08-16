@@ -94,6 +94,7 @@ class AuthProvider extends ChangeNotifier {
       _token = response['token'] ?? response['data']['token'];
       _user = User.fromJson(response['user'] ?? response['data']['user']);
       await ApiService.setToken(_token);
+      await loadProfile();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -115,6 +116,7 @@ class AuthProvider extends ChangeNotifier {
       _token = response['data']['token'];
       _user = User.fromJson(response['data']['user']);
       await ApiService.setToken(_token);
+      await loadProfile();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -139,6 +141,7 @@ class AuthProvider extends ChangeNotifier {
       _token = response['data']['token'];
       _user = User.fromJson(response['data']['user']);
       await ApiService.setToken(_token);
+      await loadProfile();
       _isLoading = false;
       notifyListeners();
       return true;

@@ -44,91 +44,175 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 350,
-          child: Stack(
-            children: [
-              PageView.builder(
-                controller: _pageController,
-                itemCount: widget.imageUrls.length,
-                onPageChanged: (i) => setState(() => _currentIndex = i),
-                itemBuilder: (context, i) {
-                  return GestureDetector(
-                    onTap: () => _showFullScreen(i),
-                    child: AppNetworkImage(
-                      imageUrl: _imageUrl(widget.imageUrls[i]),
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      placeholder: (_, __) => Container(color: Colors.grey.shade100, child: const Center(child: CircularProgressIndicator())),
-                      errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
-                    ),
-                  );
-                },
-              ),
-              if (widget.imageUrls.length > 1)
-                Positioned(
-                  bottom: 12,
-                  left: 0, right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(widget.imageUrls.length, (i) {
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: _currentIndex == i ? 24 : 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: _currentIndex == i ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 560;
+
+        if (isWide) {
+          // Big-screen layout: vertical thumbnail rail on the left, smaller
+          // main image on the right.
+          return ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Thumbnail rail
+                SizedBox(
+                  width: 72,
+                  height: 360,
+                  child: ListView.builder(
+                    itemCount: widget.imageUrls.length,
+                    itemBuilder: (context, i) {
+                      final isActive = _currentIndex == i;
+                      return GestureDetector(
+                        onTap: () {
+                          _pageController.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                        },
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isActive ? Theme.of(context).colorScheme.primary : Colors.grey.shade200,
+                              width: isActive ? 2 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: AppNetworkImage(
+                              imageUrl: _imageUrl(widget.imageUrls[i]),
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => const Icon(Icons.image, size: 20, color: Colors.grey),
+                            ),
+                          ),
                         ),
                       );
-                    }),
+                    },
                   ),
                 ),
-            ],
-          ),
-        ),
-        if (widget.imageUrls.length > 1)
-          SizedBox(
-            height: 68,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              itemCount: widget.imageUrls.length,
-              itemBuilder: (context, i) {
-                final isActive = _currentIndex == i;
-                return GestureDetector(
-                  onTap: () {
-                    _pageController.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                  },
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isActive ? Theme.of(context).colorScheme.primary : Colors.grey.shade200,
-                        width: isActive ? 2 : 1,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(7),
-                      child: AppNetworkImage(
-                        imageUrl: _imageUrl(widget.imageUrls[i]),
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const Icon(Icons.image, size: 20, color: Colors.grey),
-                      ),
+                const SizedBox(width: 12),
+                // Main image (smaller)
+                Expanded(
+                  child: SizedBox(
+                    height: 360,
+                    child: Stack(
+                      children: [
+                        PageView.builder(
+                          controller: _pageController,
+                          itemCount: widget.imageUrls.length,
+                          onPageChanged: (i) => setState(() => _currentIndex = i),
+                          itemBuilder: (context, i) {
+                            return GestureDetector(
+                              onTap: () => _showFullScreen(i),
+                              child: AppNetworkImage(
+                                imageUrl: _imageUrl(widget.imageUrls[i]),
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                placeholder: (_, __) => Container(color: Colors.grey.shade100, child: const Center(child: CircularProgressIndicator())),
+                                errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
+                ),
+              ],
             ),
-          ),
-      ],
+          );
+        }
+
+        // Mobile layout (existing): full-width main image + horizontal thumbnails
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 320,
+              child: Stack(
+                children: [
+                  PageView.builder(
+                    controller: _pageController,
+                    itemCount: widget.imageUrls.length,
+                    onPageChanged: (i) => setState(() => _currentIndex = i),
+                    itemBuilder: (context, i) {
+                      return GestureDetector(
+                        onTap: () => _showFullScreen(i),
+                        child: AppNetworkImage(
+                          imageUrl: _imageUrl(widget.imageUrls[i]),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          placeholder: (_, __) => Container(color: Colors.grey.shade100, child: const Center(child: CircularProgressIndicator())),
+                          errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                        ),
+                      );
+                    },
+                  ),
+                  if (widget.imageUrls.length > 1)
+                    Positioned(
+                      bottom: 12,
+                      left: 0, right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(widget.imageUrls.length, (i) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: _currentIndex == i ? 24 : 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              color: _currentIndex == i ? Theme.of(context).colorScheme.primary : Colors.white.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (widget.imageUrls.length > 1)
+              SizedBox(
+                height: 68,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  itemCount: widget.imageUrls.length,
+                  itemBuilder: (context, i) {
+                    final isActive = _currentIndex == i;
+                    return GestureDetector(
+                      onTap: () {
+                        _pageController.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                      },
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isActive ? Theme.of(context).colorScheme.primary : Colors.grey.shade200,
+                            width: isActive ? 2 : 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: AppNetworkImage(
+                            imageUrl: _imageUrl(widget.imageUrls[i]),
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(Icons.image, size: 20, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

@@ -19,6 +19,7 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
   String _currentSearch = '';
   String _selectedSort = 'newest';
   int? _selectedCategoryId;
+  int? _selectedBrandId;
 
   static const Map<String, String> _sortOptions = {
     'newest': 'Newest',
@@ -31,7 +32,9 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProductProvider>().fetchCategories();
+      final pp = context.read<ProductProvider>();
+      pp.fetchCategories();
+      pp.fetchBrands();
     });
   }
 
@@ -55,6 +58,7 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
     provider.fetchProducts(
       search: _currentSearch.isNotEmpty ? _currentSearch : null,
       categoryId: _selectedCategoryId,
+      brandId: _selectedBrandId,
       sortBy: _selectedSort,
       page: 1,
     );
@@ -97,6 +101,7 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
                               ? _currentSearch
                               : null,
                           categoryId: _selectedCategoryId,
+                          brandId: _selectedBrandId,
                         );
                       }
                       return false;
@@ -173,77 +178,123 @@ class _ProductSearchScreenState extends State<ProductSearchScreen> {
 
   Widget _buildFilters() {
     final categories = context.watch<ProductProvider>().categories;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedSort,
-                  hint: const Text('Sort By'),
-                  items: _sortOptions.entries
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value, style: const TextStyle(fontSize: 13)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _selectedSort = value);
-                      _fetchProducts();
-                    }
-                  },
+    final brands = context.watch<ProductProvider>().brands;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedSort,
+                      hint: const Text('Sort By'),
+                      items: _sortOptions.entries
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text(e.value, style: const TextStyle(fontSize: 13)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedSort = value);
+                          _fetchProducts();
+                        }
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int?>(
-                  isExpanded: true,
-                  value: _selectedCategoryId,
-                  hint: const Text('Category'),
-                  items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('All Categories', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      isExpanded: true,
+                      value: _selectedCategoryId,
+                      hint: const Text('Category'),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('All Categories', style: TextStyle(fontSize: 13)),
+                        ),
+                        ...categories.map(
+                          (cat) => DropdownMenuItem<int?>(
+                            value: cat.id,
+                            child: Text(cat.name, style: const TextStyle(fontSize: 13)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _selectedCategoryId = value);
+                        _fetchProducts();
+                      },
                     ),
-                    ...categories.map(
-                      (cat) => DropdownMenuItem<int?>(
-                        value: cat.id,
-                        child: Text(cat.name, style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (brands.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int?>(
+                        isExpanded: true,
+                        value: _selectedBrandId,
+                        hint: const Text('Brand'),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('All Brands', style: TextStyle(fontSize: 13)),
+                          ),
+                          ...brands.map(
+                            (b) => DropdownMenuItem<int?>(
+                              value: b.id,
+                              child: Text(b.name, style: const TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() => _selectedBrandId = value);
+                          _fetchProducts();
+                        },
                       ),
                     ),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _selectedCategoryId = value);
-                    _fetchProducts();
-                  },
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 

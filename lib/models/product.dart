@@ -17,6 +17,8 @@ class Product {
   final bool isFeatured;
   final int stockQuantity;
   final String? brand;
+  final int? brandId;
+  final BrandInfo? brandInfo;
   final String? composition;
   final String? dosage;
   final String? classification;
@@ -41,6 +43,8 @@ class Product {
     this.isFeatured = false,
     this.stockQuantity = 0,
     this.brand,
+    this.brandId,
+    this.brandInfo,
     this.composition,
     this.dosage,
     this.classification,
@@ -96,6 +100,17 @@ class Product {
           .toList();
     }
 
+    String? brandName;
+    if (json['brand'] is Map) {
+      brandName = (json['brand'] as Map)['name']?.toString();
+    } else if (json['brand'] is String) {
+      brandName = json['brand'] as String?;
+    } else {
+      brandName = json['brand_info'] is Map
+          ? (json['brand_info'] as Map)['name']?.toString()
+          : null;
+    }
+
     return Product(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
@@ -112,7 +127,11 @@ class Product {
       isActive: json['is_active'] ?? true,
       isFeatured: json['is_featured'] ?? false,
       stockQuantity: json['stock_quantity'] ?? 0,
-      brand: json['brand'],
+      brand: brandName,
+      brandId: json['brand_id'] != null ? (json['brand_id'] as num).toInt() : null,
+      brandInfo: json['brand_info'] is Map
+          ? BrandInfo.fromJson(json['brand_info'] as Map<String, dynamic>)
+          : null,
       composition: json['composition'],
       dosage: json['dosage'],
       classification: json['classification'],
@@ -143,4 +162,27 @@ class Product {
   }
 
   bool get inStock => stockQuantity > 0;
+}
+
+class BrandInfo {
+  final int id;
+  final String name;
+  final String? slug;
+  final String? logo;
+
+  const BrandInfo({
+    required this.id,
+    required this.name,
+    this.slug,
+    this.logo,
+  });
+
+  factory BrandInfo.fromJson(Map<String, dynamic> json) {
+    return BrandInfo(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      slug: json['slug'],
+      logo: json['logo'],
+    );
+  }
 }

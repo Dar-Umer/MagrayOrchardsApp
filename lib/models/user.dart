@@ -12,6 +12,9 @@ class User {
   final bool hasFreeDelivery;
   final bool hasFastSupport;
   final String? subscriptionExpires;
+  final String? defaultPincode;
+  final String? defaultCity;
+  final String? defaultState;
 
   User({
     required this.id,
@@ -27,9 +30,13 @@ class User {
     this.hasFreeDelivery = false,
     this.hasFastSupport = false,
     this.subscriptionExpires,
+    this.defaultPincode,
+    this.defaultCity,
+    this.defaultState,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final defaultAddress = json['default_address'];
     return User(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
@@ -44,6 +51,15 @@ class User {
       hasFreeDelivery: json['has_free_delivery'] ?? false,
       hasFastSupport: json['has_fast_support'] ?? false,
       subscriptionExpires: json['subscription_expires'],
+      defaultPincode: defaultAddress is Map
+          ? defaultAddress['pincode']?.toString()
+          : null,
+      defaultCity: defaultAddress is Map
+          ? defaultAddress['city']?.toString()
+          : null,
+      defaultState: defaultAddress is Map
+          ? defaultAddress['state']?.toString()
+          : null,
     );
   }
 
@@ -62,6 +78,9 @@ class User {
       'has_free_delivery': hasFreeDelivery,
       'has_fast_support': hasFastSupport,
       'subscription_expires': subscriptionExpires,
+      'default_pincode': defaultPincode,
+      'default_city': defaultCity,
+      'default_state': defaultState,
     };
   }
 

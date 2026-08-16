@@ -30,6 +30,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final _pincodeController = TextEditingController();
   Map<String, dynamic>? _pincodeResult;
   bool _pincodeLoading = false;
+  bool _usingDefaultPincode = false;
   Product? _product;
 
   @override
@@ -37,6 +38,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     _product = widget.product;
     _loadProductDetail();
+    _maybeAutoCheckDefaultAddress();
+  }
+
+  void _maybeAutoCheckDefaultAddress() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) return;
+
+      var pin = auth.user?.defaultPincode;
+      if (pin == null) {
+        // Profile may not carry the default address yet — refresh it once.
+        await auth.loadProfile();
+        if (!mounted) return;
+        pin = auth.user?.defaultPincode;
+      }
+
+      final defaultPin = pin;
+      if (defaultPin != null && defaultPin.length == 6) {
+        setState(() {
+          _usingDefaultPincode = true;
+          _pincodeController.text = defaultPin;
+        });
+        _checkPincode();
+      }
+    });
   }
 
   @override
@@ -124,113 +151,150 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final cart = context.watch<CartProvider>();
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 0,
-            pinned: true,
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: Colors.white,
-            title: Text(_p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
-            actions: [
-              if (context.read<AuthProvider>().isLoggedIn)
-                IconButton(
-                  icon: Icon(
-                    context.read<WishlistProvider>().isInWishlist(_p.id) ? Icons.favorite : Icons.favorite_border,
-                    color: context.read<WishlistProvider>().isInWishlist(_p.id) ? Colors.white : Colors.white,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 900;
+
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 0,
+                pinned: true,
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                title: Text(_p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
+                actions: [
+                  if (context.read<AuthProvider>().isLoggedIn)
+                    IconButton(
+                      icon: Icon(
+                        context.read<WishlistProvider>().isInWishlist(_p.id) ? Icons.favorite : Icons.favorite_border,
+                        color: context.read<WishlistProvider>().isInWishlist(_p.id) ? Colors.white : Colors.white,
+                      ),
+                      onPressed: () {
+                        context.read<WishlistProvider>().toggleWishlist(_p.id);
+                      },
+                    ),
+                ],
+              ),
+              if (isWide)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Gallery (left, constrained width)
+                            Expanded(
+                              child: ProductImageGallery(
+                                imageUrls: _p.allImageUrls.map((e) => _imageUrl(e)).toList(),
+                                initialIndex: _selectedImageIndex,
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            // Details (right)
+                            Expanded(child: _buildDetails(theme)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () {
-                    context.read<WishlistProvider>().toggleWishlist(_p.id);
-                  },
-                ),
-            ],
-          ),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ProductImageGallery(
-                  imageUrls: _p.allImageUrls.map((e) => _imageUrl(e)).toList(),
-                  initialIndex: _selectedImageIndex,
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
+                )
+              else
+                SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (_p.brand != null && _p.brand!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text(
-                            _p.brand!.toUpperCase(),
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade500, letterSpacing: 1.2),
-                          ),
-                        ),
-                      Text(_p.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      if (_p.categoryName != null)
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Text(_p.categoryName!, style: TextStyle(color: theme.colorScheme.primary, fontSize: 14)),
-                        ),
-                      const SizedBox(height: 8),
-                      if (_p.reviews.isNotEmpty)
-                        Row(
-                          children: [
-                            StarRating(rating: _p.reviews.fold(0, (s, r) => s + r.rating) ~/ (_p.reviews.length), size: 18),
-                            const SizedBox(width: 6),
-                            Text('(${_p.reviews.length} reviews)', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-                          ],
-                        ),
-                      const SizedBox(height: 12),
-                      if (_p.composition != null && _p.composition!.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.shade100),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.science, size: 16, color: Colors.blue.shade700),
-                                  const SizedBox(width: 6),
-                                  Text('Composition', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue.shade700, fontSize: 13)),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(_p.composition!, style: TextStyle(color: Colors.blue.shade900, fontSize: 14)),
-                            ],
-                          ),
-                        ),
-                      _buildPriceRow(theme),
-                      if (_p.variants.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        _buildVariantSelector(theme),
-                      ],
-                      const SizedBox(height: 12),
-                      _buildStockStatus(theme),
-                      const SizedBox(height: 16),
-                      if (_p.shortDescription != null && _p.shortDescription!.isNotEmpty)
-                        Text(_p.shortDescription!, style: TextStyle(color: Colors.grey.shade700, fontSize: 15, height: 1.5)),
-                      const SizedBox(height: 20),
-                      _buildPincodeCheck(theme),
-                      const SizedBox(height: 20),
-                      _buildTabs(theme),
+                      ProductImageGallery(
+                        imageUrls: _p.allImageUrls.map((e) => _imageUrl(e)).toList(),
+                        initialIndex: _selectedImageIndex,
+                      ),
+                      _buildDetails(theme),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
       bottomNavigationBar: _buildMobileBottomBar(theme, cart),
+    );
+  }
+
+  Widget _buildDetails(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_p.brand != null && _p.brand!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                _p.brand!.toUpperCase(),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade500, letterSpacing: 1.2),
+              ),
+            ),
+          Text(_p.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          if (_p.categoryName != null)
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Text(_p.categoryName!, style: TextStyle(color: theme.colorScheme.primary, fontSize: 14)),
+            ),
+          const SizedBox(height: 8),
+          if (_p.reviews.isNotEmpty)
+            Row(
+              children: [
+                StarRating(rating: _p.reviews.fold(0, (s, r) => s + r.rating) ~/ (_p.reviews.length), size: 18),
+                const SizedBox(width: 6),
+                Text('(${_p.reviews.length} reviews)', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+              ],
+            ),
+          const SizedBox(height: 12),
+          if (_p.composition != null && _p.composition!.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.science, size: 16, color: Colors.blue.shade700),
+                      const SizedBox(width: 6),
+                      Text('Composition', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue.shade700, fontSize: 13)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(_p.composition!, style: TextStyle(color: Colors.blue.shade900, fontSize: 14)),
+                ],
+              ),
+            ),
+          _buildPriceRow(theme),
+          if (_p.variants.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildVariantSelector(theme),
+          ],
+          const SizedBox(height: 12),
+          _buildStockStatus(theme),
+          const SizedBox(height: 16),
+          if (_p.shortDescription != null && _p.shortDescription!.isNotEmpty)
+            Text(_p.shortDescription!, style: TextStyle(color: Colors.grey.shade700, fontSize: 15, height: 1.5)),
+          const SizedBox(height: 20),
+          _buildPincodeCheck(theme),
+          const SizedBox(height: 20),
+          _buildTabs(theme),
+        ],
+      ),
     );
   }
 
@@ -323,22 +387,59 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           const Text('Delivery Information', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _pincodeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: InputDecoration(
-                    hintText: 'Enter pincode',
-                    counterText: '',
-                    prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          if (_usingDefaultPincode)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Delivering to ${_pincodeController.text}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _usingDefaultPincode = false;
+                      _pincodeResult = null;
+                    }),
+                    child: Text(
+                      'Change',
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!_usingDefaultPincode)
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _pincodeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: 'Enter pincode',
+                      counterText: '',
+                      prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: 10),
               SizedBox(
                 height: 46,

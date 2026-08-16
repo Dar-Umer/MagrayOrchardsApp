@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
 class ShopConfig {
@@ -17,6 +19,19 @@ class ShopConfig {
   static Color _promoBannerColor = const Color(0xFFF97316);
   static String _promoBannerLink = '';
 
+  // Mobile app version / maintenance
+  static String _androidLatestVersion = '1.0.0';
+  static String _androidMinVersion = '1.0.0';
+  static String _androidStoreUrl = '';
+  static String _iosLatestVersion = '1.0.0';
+  static String _iosMinVersion = '1.0.0';
+  static String _iosStoreUrl = '';
+  static String _updateNotes = '';
+  static bool _maintenanceEnabled = false;
+  static String _maintenanceMessage =
+      'We are currently under maintenance. Please check back soon.';
+  static String _maintenanceUntil = '';
+
   static double get taxRate => _taxRate;
   static bool get gstEnabled => _gstEnabled;
   static double get taxDecimal => _gstEnabled ? _taxRate / 100 : 0;
@@ -31,6 +46,31 @@ class ShopConfig {
   static String get promoBannerSubtitle => _promoBannerSubtitle;
   static Color get promoBannerColor => _promoBannerColor;
   static String get promoBannerLink => _promoBannerLink;
+
+  static String get androidLatestVersion => _androidLatestVersion;
+  static String get androidMinVersion => _androidMinVersion;
+  static String get androidStoreUrl => _androidStoreUrl;
+  static String get iosLatestVersion => _iosLatestVersion;
+  static String get iosMinVersion => _iosMinVersion;
+  static String get iosStoreUrl => _iosStoreUrl;
+  static String get updateNotes => _updateNotes;
+  static bool get maintenanceEnabled => _maintenanceEnabled;
+  static String get maintenanceMessage => _maintenanceMessage;
+  static String get maintenanceUntil => _maintenanceUntil;
+
+  /// Latest/min version + store URL for the current platform.
+  /// On web (or unknown platform) defaults to Android values; gating is
+  /// skipped on web since there is no installed app version to compare.
+  static String get latestVersion =>
+      _isAndroid() ? _androidLatestVersion : _iosLatestVersion;
+  static String get minVersion =>
+      _isAndroid() ? _androidMinVersion : _iosMinVersion;
+  static String get storeUrl => _isAndroid() ? _androidStoreUrl : _iosStoreUrl;
+
+  static bool _isAndroid() {
+    if (kIsWeb) return true;
+    return !Platform.isIOS;
+  }
 
   static Future<void> load() async {
     try {
@@ -53,6 +93,17 @@ class ShopConfig {
         if (parsed != null) _promoBannerColor = parsed;
       }
       _promoBannerLink = (data['promo_banner_link'] as String?) ?? '';
+
+      _androidLatestVersion = (data['mobile_app_android_latest_version'] as String?) ?? _androidLatestVersion;
+      _androidMinVersion = (data['mobile_app_android_min_version'] as String?) ?? _androidMinVersion;
+      _androidStoreUrl = (data['mobile_app_android_store_url'] as String?) ?? '';
+      _iosLatestVersion = (data['mobile_app_ios_latest_version'] as String?) ?? _iosLatestVersion;
+      _iosMinVersion = (data['mobile_app_ios_min_version'] as String?) ?? _iosMinVersion;
+      _iosStoreUrl = (data['mobile_app_ios_store_url'] as String?) ?? '';
+      _updateNotes = (data['mobile_app_update_notes'] as String?) ?? '';
+      _maintenanceEnabled = (data['mobile_app_maintenance_enabled'] as bool?) ?? false;
+      _maintenanceMessage = (data['mobile_app_maintenance_message'] as String?) ?? _maintenanceMessage;
+      _maintenanceUntil = (data['mobile_app_maintenance_until'] as String?) ?? '';
     } catch (_) {
     }
   }
@@ -64,6 +115,27 @@ class ShopConfig {
     final parsed = int.tryParse(value, radix: 16);
     if (parsed == null) return null;
     return Color(parsed);
+  }
+
+  /// Semantic version compare. Returns <0, 0, >0 if a <, ==, > b.
+  static int compareVersions(String a, String b) {
+    final pa = _parts(a);
+    final pb = _parts(b);
+    final len = pa.length > pb.length ? pa.length : pb.length;
+    for (var i = 0; i < len; i++) {
+      final x = i < pa.length ? pa[i] : 0;
+      final y = i < pb.length ? pb[i] : 0;
+      if (x != y) return x - y;
+    }
+    return 0;
+  }
+
+  static List<int> _parts(String v) {
+    return v
+        .replaceAll(RegExp(r'[^\d.]'), '')
+        .split('.')
+        .map((s) => int.tryParse(s) ?? 0)
+        .toList();
   }
 
   static double calculateTax(double subtotal) {

@@ -297,6 +297,26 @@ class ApiService {
     return Map<String, dynamic>.from((response as Map)['data'] as Map);
   }
 
+  /// Fetch active brands. Public.
+  static Future<List<dynamic>> fetchBrands() async {
+    final response = await get('/brands');
+    return ((response as Map)['data'] as List?) ?? [];
+  }
+
+  /// Get a shipping estimate for a pincode. Auth required.
+  static Future<Map<String, dynamic>> fetchShippingRate({
+    required String pincode,
+    required List<Map<String, dynamic>> items,
+    double subtotal = 0,
+  }) async {
+    final response = await post('/shipping-rate', body: {
+      'pincode': pincode,
+      'items': items,
+      'subtotal': subtotal,
+    });
+    return Map<String, dynamic>.from(response['data'] ?? response);
+  }
+
   static String _dateStr(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }

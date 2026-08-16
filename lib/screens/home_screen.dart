@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +16,7 @@ import 'register_screen.dart';
 import 'product_detail_screen.dart';
 import 'service_detail_screen.dart';
 import 'category_products_screen.dart';
+import 'brand_products_screen.dart';
 import 'product_search_screen.dart';
 import 'edit_profile_screen.dart';
 import 'orders_screen.dart';
@@ -95,10 +97,41 @@ class _HomeTab extends StatefulWidget {
 class _HomeTabState extends State<_HomeTab> {
   List<Product> _latestProducts = [];
   bool _loadingLatest = false;
+  bool _dismissedSoftUpdate = false;
+
+  // Soft update shows when installed >= min but < latest.
+  bool get showSoftUpdate {
+    if (_dismissedSoftUpdate) return false;
+    final minV = ShopConfig.minVersion;
+    final latestV = ShopConfig.latestVersion;
+    if (minV.isEmpty || latestV.isEmpty || minV == latestV) return false;
+    return _installedVersion != null &&
+        ShopConfig.compareVersions(_installedVersion!, minV) >= 0 &&
+        ShopConfig.compareVersions(_installedVersion!, latestV) < 0;
+  }
+
+  String? _installedVersion;
+
+  Future<void> _resolveInstalledVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _installedVersion = info.version;
+    } catch (_) {}
+  }
+
+  Future<void> _openStore() async {
+    final url = ShopConfig.storeUrl;
+    if (url.isEmpty) return;
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _resolveInstalledVersion();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final pp = context.read<ProductProvider>();
       if (pp.products.isEmpty) {
@@ -107,6 +140,7 @@ class _HomeTabState extends State<_HomeTab> {
         pp.fetchServices();
         pp.fetchBanners();
         pp.fetchOfferProducts();
+        pp.fetchBrands();
       }
       _fetchLatest();
     });
@@ -191,6 +225,7 @@ class _HomeTabState extends State<_HomeTab> {
           pp.fetchServices(),
           pp.fetchBanners(),
           pp.fetchOfferProducts(),
+          pp.fetchBrands(),
           _fetchLatest(),
         ]);
       },
@@ -234,6 +269,47 @@ class _HomeTabState extends State<_HomeTab> {
           ),
 
           // ── 1. Announcement Bar ──
+          // ── Soft Update Banner (non-forced, dismissible) ──
+          if (showSoftUpdate) ...[
+            SliverToBoxAdapter(
+              child: Material(
+                color: Colors.amber.shade50,
+                child: InkWell(
+                  onTap: _openStore,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.system_update_alt, color: Colors.amber.shade800, size: 20),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'A new version is available. Update for the latest features.',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _openStore,
+                          child: Text('Update',
+                              style: TextStyle(
+                                  color: Colors.amber.shade900,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13)),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => setState(() => _dismissedSoftUpdate = true),
+                          child: Icon(Icons.close, size: 18, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
@@ -538,7 +614,92 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 5. Today's Offers ──
+          // ── 5. Shop by Brand ──
+          Consumer<ProductProvider>(
+            builder: (context, pp, _) {
+              if (pp.brands.isEmpty) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              return SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SectionHeader(title: 'Shop by Brand'),
+                    SizedBox(
+                      height: 96,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        itemCount: pp.brands.length,
+                        itemBuilder: (context, index) {
+                          final brand = pp.brands[index];
+                          return GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BrandProductsScreen(
+                                  brandId: brand.id,
+                                  brandName: brand.name,
+                                ),
+                              ),
+                            ),
+                            child: Container(
+                              width: 110,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: Theme.of(context).dividerColor),
+                                    ),
+                                    child: brand.logo != null
+                                        ? ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            child: AppNetworkImage(
+                                              imageUrl:
+                                                  '${ApiConfig.imageBaseUrl}${brand.logo}',
+                                              fit: BoxFit.contain,
+                                              errorWidget: (_, __, ___) => Icon(
+                                                  Icons.business,
+                                                  color: primary),
+                                              placeholder: (_, __) => Icon(
+                                                  Icons.business,
+                                                  color: primary),
+                                            ),
+                                          )
+                                        : Icon(Icons.business,
+                                            color: primary, size: 30),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    brand.name,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          // ── 6. Today's Offers ──
           Consumer<ProductProvider>(
             builder: (context, pp, _) {
               if (!pp.offerLoading && pp.offerProducts.isEmpty) {
@@ -595,7 +756,7 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 6. Offer Promo Banner ──
+          // ── 7. Offer Promo Banner ──
           if (ShopConfig.promoBannerEnabled) ...[
             SliverToBoxAdapter(
               child: Padding(
@@ -684,7 +845,7 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ],
 
-          // ── 7. Featured Products ──
+          // ── 8. Featured Products ──
           const SliverToBoxAdapter(
             child: SectionHeader(title: 'Featured Products'),
           ),
@@ -768,7 +929,7 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 8. Latest Products ──
+          // ── 9. Latest Products ──
           const SliverToBoxAdapter(
             child: SectionHeader(title: 'Latest Products'),
           ),
@@ -825,7 +986,7 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
 
-          // ── 9. Our Services ──
+          // ── 10. Our Services ──
           const SliverToBoxAdapter(
             child: SectionHeader(title: 'Our Services'),
           ),
@@ -913,7 +1074,7 @@ class _HomeTabState extends State<_HomeTab> {
             },
           ),
 
-          // ── 10. How It Works ──
+          // ── 11. How It Works ──
           const SliverToBoxAdapter(
             child: SectionHeader(title: 'How It Works'),
           ),
@@ -947,7 +1108,7 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ),
 
-          // ── 11. CTA Banner ──
+          // ── 12. CTA Banner ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -1346,8 +1507,49 @@ class _ServicesTabState extends State<_ServicesTab> {
 // ─────────────────────────────────────────────
 // CART TAB
 // ─────────────────────────────────────────────
-class _CartTab extends StatelessWidget {
+class _CartTab extends StatefulWidget {
   const _CartTab();
+
+  @override
+  State<_CartTab> createState() => _CartTabState();
+}
+
+class _CartTabState extends State<_CartTab> {
+  final _pincodeController = TextEditingController();
+  bool _usingDefaultPincode = false;
+  bool _shippingLoading = false;
+  Map<String, dynamic>? _shippingResult;
+
+  @override
+  void dispose() {
+    _pincodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchShipping(String pincode) async {
+    if (pincode.length != 6) return;
+    setState(() {
+      _shippingLoading = true;
+      _shippingResult = null;
+    });
+    try {
+      final cart = context.read<CartProvider>();
+      final data = await ApiService.fetchShippingRate(
+        pincode: pincode,
+        items: cart.toOrderItems(),
+        subtotal: cart.total,
+      );
+      if (mounted) setState(() => _shippingResult = data);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _shippingResult = {
+          'serviceable': false,
+          'message': e is ApiException ? e.message : 'Could not check delivery',
+        });
+      }
+    }
+    if (mounted) setState(() => _shippingLoading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1377,6 +1579,28 @@ class _CartTab extends StatelessWidget {
     final subtotal = cart.total;
     final amountNeeded = freeDeliveryThreshold - subtotal;
     final freeShippingReached = amountNeeded <= 0;
+
+    // Auto-check shipping with the default address once when logged in.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (_usingDefaultPincode) return;
+      final authNow = context.read<AuthProvider>();
+      if (!authNow.isLoggedIn) return;
+
+      var pin = authNow.user?.defaultPincode;
+      if (pin == null) {
+        await authNow.loadProfile();
+        if (!mounted) return;
+        pin = authNow.user?.defaultPincode;
+      }
+
+      final defaultPin = pin;
+      if (defaultPin != null && defaultPin.length == 6) {
+        _pincodeController.text = defaultPin;
+        _usingDefaultPincode = true;
+        _fetchShipping(defaultPin);
+      }
+    });
 
     return Column(
       children: [
@@ -1538,6 +1762,127 @@ class _CartTab extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ── Shipping estimate ──
+                if (_usingDefaultPincode)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined,
+                                size: 16, color: primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Delivering to ${_pincodeController.text}',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _usingDefaultPincode = false;
+                            _shippingResult = null;
+                          }),
+                          child: Text('Change',
+                              style: TextStyle(
+                                  color: primary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _pincodeController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            decoration: InputDecoration(
+                              hintText: 'Enter pincode',
+                              counterText: '',
+                              isDense: true,
+                              prefixIcon: const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 18),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 40,
+                          child: ElevatedButton(
+                            onPressed: _shippingLoading
+                                ? null
+                                : () => _fetchShipping(
+                                    _pincodeController.text.trim()),
+                            child: _shippingLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white),
+                                  )
+                                : const Text('Check'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_shippingResult != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Shipping',
+                            style: TextStyle(color: Colors.grey, fontSize: 14)),
+                        if (_shippingResult!['serviceable'] == true)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _shippingResult!['free_delivery'] == true
+                                    ? 'Free'
+                                    : 'Rs. ${(_shippingResult!['delivery_charge'] ?? 0).toStringAsFixed(0)}',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        _shippingResult!['free_delivery'] == true
+                                            ? Colors.green
+                                            : null),
+                              ),
+                              if (_shippingResult!['estimated_days'] != null)
+                                Text(
+                                  'Est. ${_shippingResult!['estimated_days']} days',
+                                  style: const TextStyle(
+                                      color: Colors.grey, fontSize: 11),
+                                ),
+                            ],
+                          )
+                        else
+                          Flexible(
+                            child: Text(
+                              _shippingResult!['message']?.toString() ??
+                                  'Not serviceable',
+                              style: const TextStyle(
+                                  color: Colors.red, fontSize: 12),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

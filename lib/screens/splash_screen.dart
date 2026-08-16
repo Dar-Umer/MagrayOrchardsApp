@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/shop_config.dart';
+import '../widgets/maintenance_screen.dart';
+import '../widgets/update_required_screen.dart';
 import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -23,14 +27,33 @@ class _SplashScreenState extends State<SplashScreen> {
       await theme.init();
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
-      _navigate();
+      await _runGate();
     } catch (e) {
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     }
   }
 
-  void _navigate() {
+  Future<void> _runGate() async {
+    // Maintenance mode blocks the app entirely.
+    if (ShopConfig.maintenanceEnabled) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MaintenanceScreen()));
+      return;
+    }
+
+    // Force update if the installed version is below the platform minimum.
+    // Works on all platforms, including web (reads the app version).
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final installed = info.version;
+      if (ShopConfig.compareVersions(installed, ShopConfig.minVersion) < 0) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => UpdateRequiredScreen(installedVersion: installed)));
+        return;
+      }
+    } catch (_) {
+      // Unable to read version — continue to the app.
+    }
+
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 

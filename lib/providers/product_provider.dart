@@ -3,6 +3,7 @@ import '../models/product.dart';
 import '../models/category.dart';
 import '../models/service_model.dart';
 import '../models/banner.dart';
+import '../models/brand.dart';
 import '../services/api_service.dart';
 
 class ProductProvider extends ChangeNotifier {
@@ -12,6 +13,7 @@ class ProductProvider extends ChangeNotifier {
   List<Product> _categoryProducts = [];
   List<Product> _searchProducts = [];
   List<Category> _categories = [];
+  List<Brand> _brands = [];
   List<ServiceModel> _services = [];
   List<AppBanner> _banners = [];
   bool _isLoading = false;
@@ -29,6 +31,7 @@ class ProductProvider extends ChangeNotifier {
   List<Product> get categoryProducts => _categoryProducts;
   List<Product> get searchProducts => _searchProducts;
   List<Category> get categories => _categories;
+  List<Brand> get brands => _brands;
   List<ServiceModel> get services => _services;
   List<AppBanner> get banners => _banners;
   bool get isLoading => _isLoading;
@@ -45,6 +48,7 @@ class ProductProvider extends ChangeNotifier {
   Future<void> fetchProducts(
       {String? search,
       int? categoryId,
+      int? brandId,
       bool? isFeatured,
       String? sortBy,
       int page = 1}) async {
@@ -67,6 +71,9 @@ class ProductProvider extends ChangeNotifier {
       if (search != null && search.isNotEmpty) queryParams['search'] = search;
       if (categoryId != null) {
         queryParams['category_id'] = categoryId.toString();
+      }
+      if (brandId != null) {
+        queryParams['brand_id'] = brandId.toString();
       }
       if (isFeatured != null) {
         queryParams['is_featured'] = isFeatured.toString();
@@ -102,6 +109,7 @@ class ProductProvider extends ChangeNotifier {
       _currentPage = page;
       _hasMore = loaded.isNotEmpty;
     } catch (e) {
+      debugPrint('ProductProvider.fetchProducts error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load products. Please check your connection.';
     }
 
@@ -113,11 +121,12 @@ class ProductProvider extends ChangeNotifier {
   }
 
   Future<void> loadMore(
-      {String? search, int? categoryId, bool? isFeatured}) async {
+      {String? search, int? categoryId, int? brandId, bool? isFeatured}) async {
     if (!_hasMore || _isLoading) return;
     await fetchProducts(
       search: search,
       categoryId: categoryId,
+      brandId: brandId,
       isFeatured: isFeatured,
       page: _currentPage + 1,
     );
@@ -140,6 +149,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _offerProducts = items.map((p) => Product.fromJson(p)).toList();
     } catch (e) {
+      debugPrint('ProductProvider.fetchOfferProducts error: $e');
       _errorMessage =
           e is ApiException ? e.message : 'Could not load offers.';
     }
@@ -169,7 +179,21 @@ class ProductProvider extends ChangeNotifier {
       _categories = items.map((c) => Category.fromJson(c)).toList();
       notifyListeners();
     } catch (e) {
+      debugPrint('ProductProvider.fetchCategories error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load categories.';
+    }
+  }
+
+  Future<void> fetchBrands() async {
+    try {
+      final items = await ApiService.fetchBrands();
+      _brands = items
+          .map((b) => Brand.fromJson(b as Map<String, dynamic>))
+          .toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('ProductProvider.fetchBrands error: $e');
+      _errorMessage = e is ApiException ? e.message : 'Could not load brands.';
     }
   }
 
@@ -189,6 +213,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _services = items.map((s) => ServiceModel.fromJson(s)).toList();
     } catch (e) {
+      debugPrint('ProductProvider.fetchServices error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load services.';
     }
     _isLoading = false;

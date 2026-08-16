@@ -72,7 +72,8 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (product.brand != null && product.brand!.isNotEmpty)
+                  if (product.brandInfo?.name != null ||
+                      (product.brand != null && product.brand!.isNotEmpty))
                     Positioned(
                       top: 8,
                       right: 8,
@@ -83,7 +84,7 @@ class ProductCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          product.brand!,
+                          product.brandInfo?.name ?? product.brand ?? '',
                           style: const TextStyle(
                               color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                         ),
