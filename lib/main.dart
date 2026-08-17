@@ -9,6 +9,7 @@ import 'providers/wishlist_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/subscription_provider.dart';
 import 'providers/wallet_provider.dart';
+import 'providers/reels_provider.dart';
 import 'services/shop_config.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -43,6 +44,7 @@ class MagrayOrchardsApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
         ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(create: (_) => ReelsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

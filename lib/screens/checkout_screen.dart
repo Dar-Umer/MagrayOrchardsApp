@@ -954,7 +954,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
-          if (_walletBalance > 0 || total > 0) ...[
+          if (_walletBalance > 0) ...[
             RadioListTile<String>(
               value: 'wallet',
               groupValue: _paymentMethod,
@@ -964,9 +964,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               subtitle: Text(
                 walletCanPayFull
                     ? 'Balance: ₹${_walletBalance.toStringAsFixed(0)} — covers full amount'
-                    : _walletBalance > 0
-                        ? 'Balance: ₹${_walletBalance.toStringAsFixed(0)} — ₹${(total - _walletBalance).toStringAsFixed(0)} via Razorpay'
-                        : 'Balance: ₹0.00 — insufficient funds',
+                    : 'Balance: ₹${_walletBalance.toStringAsFixed(0)} — ₹${(total - _walletBalance).toStringAsFixed(0)} via Razorpay',
               ),
               secondary: Icon(Icons.account_balance_wallet, color: cs.primary),
             ),

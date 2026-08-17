@@ -35,4 +35,17 @@ class Review {
       userName: name,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'product_id': productId,
+      'rating': rating,
+      'comment': comment,
+      'is_approved': isApproved,
+      'created_at': createdAt,
+      'user': userName != null ? {'name': userName} : null,
+    };
+  }
 }

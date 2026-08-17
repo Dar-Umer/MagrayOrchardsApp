@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import '../providers/cart_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/shop_config.dart';
 import '../widgets/maintenance_screen.dart';
@@ -25,6 +26,7 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final theme = context.read<ThemeProvider>();
       await theme.init();
+      await context.read<CartProvider>().loadFromLocal();
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
       await _runGate();

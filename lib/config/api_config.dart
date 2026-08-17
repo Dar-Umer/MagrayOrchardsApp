@@ -1,6 +1,6 @@
 class ApiConfig {
   static String get baseUrl {
-    return 'http://magrayorchards.com/api';
+    return 'http://localhost:8000/api';
   }
-  static String get imageBaseUrl => 'http://magrayorchards.com/api/images/';
+  static String get imageBaseUrl => 'http://localhost:8000/api/images/';
 }

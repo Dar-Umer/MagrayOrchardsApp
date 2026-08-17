@@ -40,11 +40,11 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       ),
       body: Consumer<ProductProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading && provider.products.isEmpty) {
+          if (provider.categoryLoading && provider.categoryProducts.isEmpty) {
             return _buildShimmer();
           }
 
-          if (provider.products.isEmpty) {
+          if (provider.categoryProducts.isEmpty) {
             return _buildEmpty();
           }
 
@@ -71,9 +71,9 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
-                itemCount: provider.products.length,
+                itemCount: provider.categoryProducts.length,
                 itemBuilder: (context, index) {
-                  final product = provider.products[index];
+                  final product = provider.categoryProducts[index];
                   return ProductCard(
                     product: product,
                     onTap: () => Navigator.push(

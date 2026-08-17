@@ -169,10 +169,13 @@ class ProductCard extends StatelessWidget {
                           onPressed: () {
                             final cart = context.read<CartProvider>();
                             cart.addItem(product);
+                            ScaffoldMessenger.of(context)..hideCurrentSnackBar();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: const Text('Added to cart'),
                                 backgroundColor: theme.colorScheme.primary,
+                                duration: const Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
                                 action: SnackBarAction(
                                   label: 'VIEW CART',
                                   textColor: Colors.white,

@@ -80,6 +80,11 @@ class ProductProvider extends ChangeNotifier {
       }
       if (sortBy != null) queryParams['sort_by'] = sortBy;
       queryParams['page'] = page.toString();
+      if (search != null && search.isNotEmpty) {
+        // Search results keep out-of-stock visible so users can see them.
+      } else {
+        queryParams['in_stock'] = 'true';
+      }
 
       final response = await ApiService.get('/products', queryParams: queryParams);
       final envelope = response['data'];
@@ -96,9 +101,17 @@ class ProductProvider extends ChangeNotifier {
       if (isFeatured == true) {
         _featuredProducts = loaded;
       } else if (categoryId != null) {
-        _categoryProducts = loaded;
+        if (page == 1) {
+          _categoryProducts = loaded;
+        } else {
+          _categoryProducts = [..._categoryProducts, ...loaded];
+        }
       } else if (search != null && search.isNotEmpty) {
-        _searchProducts = loaded;
+        if (page == 1) {
+          _searchProducts = loaded;
+        } else {
+          _searchProducts = [..._searchProducts, ...loaded];
+        }
       } else {
         if (page == 1) {
           _products = loaded;
@@ -137,7 +150,7 @@ class ProductProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final response = await ApiService.get('/products',
-          queryParams: {'is_offer': 'true', 'page': '1'});
+          queryParams: {'is_offer': 'true', 'page': '1', 'in_stock': 'true'});
       final envelope = response['data'];
       List<dynamic> items;
       if (envelope is Map && envelope.containsKey('data')) {
@@ -154,6 +167,55 @@ class ProductProvider extends ChangeNotifier {
           e is ApiException ? e.message : 'Could not load offers.';
     }
     _offerLoading = false;
+    notifyListeners();
+  }
+
+  /// Fetch products for a custom home section (category / brand sources).
+  /// Results are stored under [key] so different sections don't clobber each
+  /// other. `sortBy` uses the same allowed values as the API (`newest`,
+  /// `price_asc`, `price_desc`, `name`).
+  final Map<String, List<Product>> _sectionProducts = {};
+  final Map<String, bool> _sectionLoading = {};
+
+  List<Product> sectionProducts(String key) => _sectionProducts[key] ?? const [];
+  bool isSectionLoading(String key) => _sectionLoading[key] ?? false;
+
+  Future<void> fetchSectionProducts(
+    String key, {
+    int? categoryId,
+    int? brandId,
+    String? sortBy,
+    int? limit,
+  }) async {
+    if (categoryId == null && brandId == null) return;
+    _sectionLoading[key] = true;
+    notifyListeners();
+    try {
+      final queryParams = <String, String>{
+        'page': '1',
+        'in_stock': 'true',
+      };
+      if (categoryId != null) queryParams['category_id'] = categoryId.toString();
+      if (brandId != null) queryParams['brand_id'] = brandId.toString();
+      if (sortBy != null && sortBy.isNotEmpty) queryParams['sort_by'] = sortBy;
+      if (limit != null) queryParams['per_page'] = limit.toString();
+
+      final response = await ApiService.get('/products', queryParams: queryParams);
+      final envelope = response['data'];
+      List<dynamic> items;
+      if (envelope is Map && envelope.containsKey('data')) {
+        items = envelope['data'] ?? [];
+      } else if (envelope is List) {
+        items = envelope;
+      } else {
+        items = [];
+      }
+      _sectionProducts[key] = items.map((p) => Product.fromJson(p)).toList();
+    } catch (e) {
+      debugPrint('ProductProvider.fetchSectionProducts error: $e');
+      _sectionProducts[key] = [];
+    }
+    _sectionLoading[key] = false;
     notifyListeners();
   }
 

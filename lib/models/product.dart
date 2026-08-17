@@ -156,6 +156,35 @@ class Product {
     return urls;
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'slug': slug,
+      'description': description,
+      'short_description': shortDescription,
+      'price': price,
+      'compare_price': comparePrice,
+      'image': image,
+      'category_id': categoryId,
+      'category_name': categoryName,
+      'is_active': isActive,
+      'is_featured': isFeatured,
+      'stock_quantity': stockQuantity,
+      'brand_id': brandId,
+      'brand': brand,
+      'brand_info': brandInfo?.toJson(),
+      'composition': composition,
+      'dosage': dosage,
+      'classification': classification,
+      'recommended_crops': recommendedCrops,
+      'sku': sku,
+      'images': images.map((e) => e.toJson()).toList(),
+      'variants': variants.map((e) => e.toJson()).toList(),
+      'reviews': reviews.map((e) => e.toJson()).toList(),
+    };
+  }
+
   int get discountPercent {
     if (comparePrice == null || comparePrice! <= 0 || price <= 0) return 0;
     return ((comparePrice! - price) / comparePrice! * 100).round();
@@ -184,5 +213,9 @@ class BrandInfo {
       slug: json['slug'],
       logo: json['logo'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'name': name, 'slug': slug, 'logo': logo};
   }
 }

@@ -128,10 +128,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _addToCart() {
     final cart = context.read<CartProvider>();
     cart.addItem(_p, quantity: _quantity);
+    ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Added to cart'),
         backgroundColor: Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
         action: SnackBarAction(label: 'VIEW CART', textColor: Colors.white, onPressed: () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen()));
         }),
@@ -696,6 +699,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   visualDensity: VisualDensity.compact,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 46,
+              child: OutlinedButton(
+                onPressed: _addToCart,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Add to Cart', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
           const SizedBox(width: 12),

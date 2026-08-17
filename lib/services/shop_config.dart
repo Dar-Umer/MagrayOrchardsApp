@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import '../models/home_section.dart';
 import 'api_service.dart';
 
 class ShopConfig {
@@ -32,6 +33,41 @@ class ShopConfig {
       'We are currently under maintenance. Please check back soon.';
   static String _maintenanceUntil = '';
 
+  // App home page layout (ordered, admin-configurable).
+  static List<HomeSection> _homeSections = const [];
+
+  static const List<HomeSection> _defaultHomeSections = [
+    HomeSection(type: 'announcement'),
+    HomeSection(type: 'delivery'),
+    HomeSection(type: 'banner_carousel'),
+    HomeSection(type: 'categories'),
+    HomeSection(type: 'brands'),
+    HomeSection(type: 'promo'),
+    HomeSection(
+        type: 'products',
+        title: "Today's Offers",
+        source: 'offers',
+        layout: 'carousel',
+        rows: 1,
+        limit: 10),
+    HomeSection(type: 'subscription'),
+    HomeSection(
+        type: 'products',
+        title: 'Featured Products',
+        source: 'featured',
+        layout: 'carousel',
+        rows: 1,
+        limit: 10),
+    HomeSection(
+        type: 'products',
+        title: 'Newly Added',
+        source: 'newest',
+        layout: 'grid',
+        rows: 2,
+        limit: 10),
+    HomeSection(type: 'services'),
+  ];
+
   static double get taxRate => _taxRate;
   static bool get gstEnabled => _gstEnabled;
   static double get taxDecimal => _gstEnabled ? _taxRate / 100 : 0;
@@ -57,6 +93,11 @@ class ShopConfig {
   static bool get maintenanceEnabled => _maintenanceEnabled;
   static String get maintenanceMessage => _maintenanceMessage;
   static String get maintenanceUntil => _maintenanceUntil;
+
+  /// Ordered home sections. Falls back to the built-in default layout when
+  /// the admin has not saved a layout (or the payload is empty).
+  static List<HomeSection> get homeSections =>
+      _homeSections.isNotEmpty ? _homeSections : _defaultHomeSections;
 
   /// Latest/min version + store URL for the current platform.
   /// On web (or unknown platform) defaults to Android values; gating is
@@ -104,6 +145,9 @@ class ShopConfig {
       _maintenanceEnabled = (data['mobile_app_maintenance_enabled'] as bool?) ?? false;
       _maintenanceMessage = (data['mobile_app_maintenance_message'] as String?) ?? _maintenanceMessage;
       _maintenanceUntil = (data['mobile_app_maintenance_until'] as String?) ?? '';
+
+      final layout = HomeLayout.fromJson(data['home_layout']);
+      _homeSections = layout.sections;
     } catch (_) {
     }
   }

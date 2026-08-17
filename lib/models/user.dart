@@ -84,6 +84,31 @@ class User {
     };
   }
 
+  User copyWith({
+    String? defaultPincode,
+    String? defaultCity,
+    String? defaultState,
+  }) {
+    return User(
+      id: id,
+      name: name,
+      email: email,
+      phone: phone,
+      phoneVerifiedAt: phoneVerifiedAt,
+      role: role,
+      avatar: avatar,
+      isActive: isActive,
+      isProMember: isProMember,
+      currentPlan: currentPlan,
+      hasFreeDelivery: hasFreeDelivery,
+      hasFastSupport: hasFastSupport,
+      subscriptionExpires: subscriptionExpires,
+      defaultPincode: defaultPincode ?? this.defaultPincode,
+      defaultCity: defaultCity ?? this.defaultCity,
+      defaultState: defaultState ?? this.defaultState,
+    );
+  }
+
   String get displayName => name.isNotEmpty ? name : (phone ?? 'User');
 
   String get initials {

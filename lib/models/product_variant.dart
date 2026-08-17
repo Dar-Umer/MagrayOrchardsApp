@@ -37,6 +37,20 @@ class ProductVariant {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'product_id': productId,
+      'name': name,
+      'sku': sku,
+      'price': price,
+      'compare_price': comparePrice,
+      'stock_quantity': stockQuantity,
+      'image': image,
+      'attributes': attributes,
+    };
+  }
+
   int get discountPercent {
     if (comparePrice == null || comparePrice! <= 0 || price <= 0) return 0;
     return ((comparePrice! - price) / comparePrice! * 100).round();

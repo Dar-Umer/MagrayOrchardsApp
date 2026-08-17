@@ -25,5 +25,15 @@ class ProductImage {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'product_id': productId,
+      'image_path': imagePath,
+      'sort_order': sortOrder,
+      'is_primary': isPrimary,
+    };
+  }
+
   String get url => '${ApiConfig.imageBaseUrl}$imagePath';
 }

@@ -234,4 +234,19 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Update the local user's default delivery address (pincode/city/state).
+  void setDefaultAddress({
+    String? pincode,
+    String? city,
+    String? state,
+  }) {
+    if (_user == null) return;
+    _user = _user!.copyWith(
+      defaultPincode: pincode,
+      defaultCity: city,
+      defaultState: state,
+    );
+    notifyListeners();
+  }
 }

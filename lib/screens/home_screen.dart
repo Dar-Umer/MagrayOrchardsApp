@@ -1,14 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_network_image.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/address_provider.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
+import '../models/home_section.dart';
 import '../services/api_service.dart';
 import '../services/shop_config.dart';
 import 'login_screen.dart';
@@ -17,10 +21,12 @@ import 'product_detail_screen.dart';
 import 'service_detail_screen.dart';
 import 'category_products_screen.dart';
 import 'brand_products_screen.dart';
+import 'reels_screen.dart';
 import 'product_search_screen.dart';
 import 'edit_profile_screen.dart';
 import 'orders_screen.dart';
 import 'address_screen.dart';
+import 'address_form_screen.dart';
 import 'wishlist_screen.dart';
 import 'subscription_screen.dart';
 import 'wallet_screen.dart';
@@ -40,12 +46,1347 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  // ── Inline search state ──
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  bool _isListening = false;
+  final SpeechToText _speech = SpeechToText();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pp = context.read<ProductProvider>();
+      if (pp.products.isEmpty) {
+        pp.fetchProducts(isFeatured: true, page: 1);
+        pp.fetchCategories();
+        pp.fetchServices();
+        pp.fetchBanners();
+        pp.fetchOfferProducts();
+        pp.fetchBrands();
+      }
+      _fetchSectionProducts(pp);
+    });
+  }
+
+  /// Trigger fetches for any admin-configured category/brand product sections.
+  void _fetchSectionProducts(ProductProvider pp) {
+    final seen = <String>{};
+    for (final section in ShopConfig.homeSections) {
+      if (!section.enabled || section.type != 'products') continue;
+      // Fetch enough items to fill the configured rows.
+      final perPage = section.isGrid
+          ? (section.rowCount * 2)
+          : (section.rowCount * 6);
+      final fetchLimit = perPage < 12 ? 12 : perPage;
+      if (section.source == 'category' && section.categoryId != null) {
+        final key = 'category_${section.categoryId}';
+        if (seen.add(key) && pp.sectionProducts(key).isEmpty) {
+          pp.fetchSectionProducts(key,
+              categoryId: section.categoryId, limit: fetchLimit);
+        }
+      } else if (section.source == 'brand' && section.brandId != null) {
+        final key = 'brand_${section.brandId}';
+        if (seen.add(key) && pp.sectionProducts(key).isEmpty) {
+          pp.fetchSectionProducts(key,
+              brandId: section.brandId, limit: fetchLimit);
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = query.trim());
+      final pp = context.read<ProductProvider>();
+      if (_searchQuery.isNotEmpty) {
+        pp.fetchProducts(search: _searchQuery, page: 1);
+      }
+    });
+  }
+
+  Future<void> _toggleVoiceSearch() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+    try {
+      final available = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+      );
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Voice search is not available on this device')),
+          );
+        }
+        return;
+      }
+      if (mounted) setState(() => _isListening = true);
+      await _speech.listen(
+        listenOptions: SpeechListenOptions(
+          partialResults: false,
+          cancelOnError: true,
+          localeId: 'en_IN',
+        ),
+        onResult: (result) {
+          if (result.recognizedWords.isNotEmpty) {
+            _searchController.text = result.recognizedWords;
+            _searchController.selection = TextSelection.collapsed(
+              offset: _searchController.text.length,
+            );
+            _onSearchChanged(result.recognizedWords);
+          }
+        },
+      );
+    } catch (_) {
+      if (mounted) setState(() => _isListening = false);
+    }
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final cartCount = context.watch<CartProvider>().itemCount;
+
+    if (_currentIndex != 0) return _legacyBuild(context);
+
+    return Scaffold(
+      body: RefreshIndicator(
+        color: scheme.primary,
+        onRefresh: () async {
+          final pp = context.read<ProductProvider>();
+          await Future.wait([
+            pp.fetchProducts(isFeatured: true, page: 1),
+            pp.fetchCategories(),
+            pp.fetchServices(),
+            pp.fetchBanners(),
+            pp.fetchOfferProducts(),
+            pp.fetchBrands(),
+          ]);
+          _fetchSectionProducts(pp);
+        },
+        child: CustomScrollView(
+          slivers: [
+            if (_isSectionEnabled('announcement'))
+              SliverToBoxAdapter(child: _buildAnnouncementBar(context)),
+            SliverToBoxAdapter(
+              child: _buildReferenceHeader(context, cartCount),
+            ),
+            SliverToBoxAdapter(child: _buildSearchBar(context)),
+            if (_searchQuery.isNotEmpty)
+              _buildSearchResults(context)
+            else ...[
+              ..._buildHomeSections(context),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ],
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: scheme.primary),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.slow_motion_video_outlined),
+            selectedIcon: Icon(Icons.slow_motion_video, color: scheme.primary),
+            label: 'Reels',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.construction_outlined),
+            selectedIcon: Icon(Icons.construction, color: scheme.primary),
+            label: 'Services',
+          ),
+          NavigationDestination(
+            icon: _cartNavigationIcon(context, false),
+            selectedIcon: _cartNavigationIcon(context, true),
+            label: 'Cart',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.person_outlined),
+            selectedIcon: Icon(Icons.person, color: scheme.primary),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cartNavigationIcon(BuildContext context, bool selected) {
+    final count = context.watch<CartProvider>().itemCount;
+    final icon = Icon(
+      selected ? Icons.shopping_cart : Icons.shopping_cart_outlined,
+      color: selected ? Theme.of(context).colorScheme.primary : null,
+    );
+    if (count == 0) return icon;
+    return Badge(label: Text('$count'), child: icon);
+  }
+
+  Widget _shimmerCard() {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      ),
+    );
+  }
+
+  Future<void> _openPromoLink(BuildContext context) async {
+    final link = ShopConfig.promoBannerLink;
+    if (link.startsWith('http://') || link.startsWith('https://')) {
+      final uri = Uri.tryParse(link);
+      if (uri != null && await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProductSearchScreen()),
+      );
+    }
+  }
+
+  Widget _buildReferenceHeader(BuildContext context, int cartCount) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      color: primary,
+      padding: EdgeInsets.only(
+        top: MediaQuery.paddingOf(context).top + 10,
+        left: 18,
+        right: 12,
+        bottom: 16,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Magray Orchards',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Wishlist',
+            onPressed: () => Navigator.pushNamed(context, '/wishlist'),
+            icon: const Icon(
+              Icons.favorite_border_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                tooltip: 'Cart',
+                onPressed: () => setState(() => _currentIndex = 3),
+                icon: const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              if (cartCount > 0)
+                Positioned(
+                  right: 2,
+                  top: 0,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$cartCount',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      color: primary,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      child: TextField(
+        controller: _searchController,
+        onChanged: _onSearchChanged,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 15),
+        decoration: InputDecoration(
+          hintText: 'Search products, brands or crops',
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          prefixIcon: Icon(Icons.search_rounded, color: primary, size: 24),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: Colors.grey.shade500),
+                  onPressed: _clearSearch,
+                )
+              : IconButton(
+                  tooltip: _isListening ? 'Stop listening' : 'Voice search',
+                  icon: Icon(
+                    _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: _isListening ? Colors.red : Colors.grey.shade500,
+                    size: 24,
+                  ),
+                  onPressed: _toggleVoiceSearch,
+                ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: BorderSide(color: primary, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Inline search results grid (shown instead of home content while typing).
+  Widget _buildSearchResults(BuildContext context) {
+    return Consumer<ProductProvider>(
+      builder: (context, pp, _) {
+        if (pp.searchLoading && pp.searchProducts.isEmpty) {
+          return SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.68,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (_, __) => _shimmerCard(),
+                childCount: 6,
+              ),
+            ),
+          );
+        }
+        if (pp.searchProducts.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No products found',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Try a different search term',
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        return SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.68,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => ProductCard(
+                product: pp.searchProducts[index],
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(product: pp.searchProducts[index]),
+                  ),
+                ),
+              ),
+              childCount: pp.searchProducts.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build the home page body sections in the admin-configured order.
+  bool _isSectionEnabled(String type) =>
+      ShopConfig.homeSections.any((s) => s.type == type && s.enabled);
+
+  List<Widget> _buildHomeSections(BuildContext context) {
+    final pp = context.watch<ProductProvider>();
+    final sections = ShopConfig.homeSections
+        .where((s) => s.enabled && s.type != 'announcement')
+        .toList();
+
+    final slivers = <Widget>[];
+
+    for (var i = 0; i < sections.length; i++) {
+      final section = sections[i];
+      final hasSpacerBefore =
+          (section.type == 'products' || section.type == 'services') &&
+              slivers.isNotEmpty;
+      if (hasSpacerBefore) {
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 6)));
+      }
+
+      switch (section.type) {
+        case 'announcement':
+          break;
+        case 'delivery':
+          slivers.add(SliverToBoxAdapter(child: _buildDeliveryBar(context)));
+          break;
+        case 'banner_carousel':
+          slivers.add(SliverToBoxAdapter(child: _buildReferenceBanners(context)));
+          break;
+        case 'categories':
+          slivers.add(SliverToBoxAdapter(child: _buildCategoriesRail(context)));
+          break;
+        case 'brands':
+          slivers.add(SliverToBoxAdapter(child: _buildBrandRail(context)));
+          break;
+        case 'promo':
+          slivers.add(SliverToBoxAdapter(child: _buildPromoStrip(context)));
+          break;
+        case 'subscription':
+          slivers.add(SliverToBoxAdapter(child: _buildSubscriptionBanner(context)));
+          break;
+        case 'services':
+          slivers.add(_buildServicesSection(context));
+          break;
+        case 'products':
+          slivers.add(_buildConfiguredProductSection(context, pp, section));
+          break;
+      }
+    }
+
+    return slivers;
+  }
+
+  Widget _buildConfiguredProductSection(
+      BuildContext context, ProductProvider pp, HomeSection section) {
+    final String title;
+    final List<Product> products;
+    final bool loading;
+
+    switch (section.source) {
+      case 'offers':
+        title = section.title ?? "Today's Offers";
+        products = pp.offerProducts;
+        loading = pp.offerLoading;
+        break;
+      case 'featured':
+        title = section.title ?? 'Featured Products';
+        products = pp.featuredProducts;
+        loading = pp.featuredLoading;
+        break;
+      case 'newest':
+        title = section.title ?? 'Newly Added';
+        products = pp.products;
+        loading = pp.isLoading;
+        break;
+      case 'category':
+        title = section.title ?? 'Products';
+        final key = 'category_${section.categoryId}';
+        products = pp.sectionProducts(key);
+        loading = pp.isSectionLoading(key);
+        break;
+      case 'brand':
+        title = section.title ?? 'Products';
+        final key = 'brand_${section.brandId}';
+        products = pp.sectionProducts(key);
+        loading = pp.isSectionLoading(key);
+        break;
+      default:
+        title = section.title ?? 'Products';
+        products = pp.products;
+        loading = pp.isLoading;
+    }
+
+    return _buildProductSection(
+      context,
+      title: title,
+      products: products,
+      loading: loading,
+      grid: section.isGrid,
+      rows: section.rowCount,
+    );
+  }
+
+  Widget _buildAnnouncementBar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final message = ShopConfig.announcementMessage;
+    if (message.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      color: scheme.primaryContainer.withValues(alpha: 0.5),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.campaign_rounded, color: scheme.primary, size: 16),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              message,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: scheme.onPrimaryContainer,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionBanner(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    if (!auth.isLoggedIn || user?.isProMember == true) {
+      return const SizedBox.shrink();
+    }
+    final primary = Theme.of(context).colorScheme.primary;
+    final primaryDark = Theme.of(context).colorScheme.onPrimaryContainer;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Theme.of(context).colorScheme.tertiary, primary],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.workspace_premium, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Go Pro with Magray Orchards',
+                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Free delivery, fast support & premium content',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: primaryDark,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Explore Plans'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandRail(BuildContext context) {
+    final pp = context.watch<ProductProvider>();
+    if (pp.brands.isEmpty) return const SizedBox.shrink();
+    final primary = Theme.of(context).colorScheme.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(18, 20, 18, 4),
+          child: Text(
+            'Shop by Brand',
+            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+          ),
+        ),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: pp.brands.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final brand = pp.brands[index];
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BrandProductsScreen(
+                      brandId: brand.id,
+                      brandName: brand.name,
+                    ),
+                  ),
+                ),
+                child: SizedBox(
+                  width: 96,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Theme.of(context).dividerColor),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: brand.logo != null
+                            ? AppNetworkImage(
+                                imageUrl: '${ApiConfig.imageBaseUrl}${brand.logo}',
+                                fit: BoxFit.contain,
+                                errorWidget: (_, __, ___) => Icon(Icons.business, color: primary),
+                                placeholder: (_, __) => Icon(Icons.business, color: primary),
+                              )
+                            : Icon(Icons.business, color: primary, size: 32),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        brand.name,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeliveryBar(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final pin = auth.user?.defaultPincode;
+    final primary = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onTap: () => _openDeliveryAddressPicker(context),
+      child: Container(
+        color: primary,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on_rounded, color: Colors.white, size: 22),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                pin == null ? 'Delivering across Kashmir' : 'Delivering to $pin',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Show a bottom sheet to pick a delivery address or add a new one.
+  Future<void> _openDeliveryAddressPicker(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+
+    if (!auth.isLoggedIn) {
+      final goToLogin = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Login required'),
+          content: const Text('Please login to choose a delivery address.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Login'),
+            ),
+          ],
+        ),
+      );
+      if (goToLogin == true && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+
+    final addressProvider = context.read<AddressProvider>();
+    if (addressProvider.addresses.isEmpty) {
+      await addressProvider.fetchAddresses();
+    }
+    if (!mounted) return;
+
+    final scheme = Theme.of(context).colorScheme;
+    final primary = scheme.primary;
+    final primaryContainer = scheme.primaryContainer;
+
+    // Track whether an address was added from within the sheet so we refresh.
+    var added = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, color: primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Deliver to',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Consumer<AddressProvider>(
+                      builder: (ctx, ap, _) {
+                        if (ap.isLoading && ap.addresses.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        }
+                        if (ap.addresses.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Center(
+                              child: Text(
+                                'No saved addresses yet. Add one to get delivery estimates.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ),
+                          );
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: ap.addresses.map((address) {
+                            final isSelected = ap.selectedAddress?.id ==
+                                address.id;
+                            return Card(
+                              elevation: 0,
+                              margin:
+                                  const EdgeInsets.only(bottom: 8),
+                              color: isSelected
+                                  ? primaryContainer.withValues(alpha: 0.4)
+                                  : scheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? primary
+                                      : scheme.outlineVariant,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: ListTile(
+                                onTap: () {
+                                  ap.selectAddress(address.id);
+                                  auth.setDefaultAddress(
+                                    pincode: address.pincode,
+                                    city: address.city,
+                                    state: address.state,
+                                  );
+                                  Navigator.pop(sheetContext);
+                                },
+                                title: Text(
+                                  address.addressLine1,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${address.city}, ${address.state} ${address.pincode}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                leading: Icon(Icons.home_outlined, color: primary),
+                                trailing: isSelected
+                                    ? Icon(Icons.check_circle, color: primary)
+                                    : null,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          added = true;
+                          await Navigator.push(
+                            sheetContext,
+                            MaterialPageRoute(
+                              builder: (_) => const AddressFormScreen(),
+                            ),
+                          );
+                          if (sheetContext.mounted) {
+                            await addressProvider.fetchAddresses();
+                            setSheetState(() {});
+                          }
+                        },
+                        icon: const Icon(Icons.add_location_alt_outlined),
+                        label: const Text('Add New Address'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primary,
+                          side: BorderSide(color: primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (added && mounted) {
+      // A new address was added: use it as the delivery default.
+      final newDefault = addressProvider.selectedAddress;
+      if (newDefault != null) {
+        auth.setDefaultAddress(
+          pincode: newDefault.pincode,
+          city: newDefault.city,
+          state: newDefault.state,
+        );
+      }
+    }
+  }
+
+  Widget _buildReferenceBanners(BuildContext context) {
+    final pp = context.watch<ProductProvider>();
+    if (pp.banners.isEmpty) return const SizedBox(height: 8);
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      color: primary,
+      padding: const EdgeInsets.only(bottom: 14),
+      child: CarouselSlider(
+        options: CarouselOptions(
+          height: 152,
+          autoPlay: true,
+          viewportFraction: .92,
+          enlargeCenterPage: true,
+          autoPlayInterval: const Duration(seconds: 4),
+        ),
+        items: pp.banners
+            .map(
+              (banner) => ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (banner.image != null)
+                      AppNetworkImage(
+                        imageUrl: '${ApiConfig.imageBaseUrl}${banner.image}',
+                        fit: BoxFit.cover,
+                      )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [primary, primary.withValues(alpha: .65)],
+                          ),
+                        ),
+                      ),
+                    if (banner.title != null)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 13,
+                        child: Text(
+                          banner.title!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 5),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildCategoriesRail(BuildContext context) {
+    final pp = context.watch<ProductProvider>();
+    if (pp.categories.isEmpty) return const SizedBox.shrink();
+    final primary = Theme.of(context).colorScheme.primary;
+    return Container(
+      color: Colors.white,
+      height: 190,
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: GridView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisExtent: 90,
+          mainAxisSpacing: 5,
+          crossAxisSpacing: 2,
+        ),
+        itemCount: pp.categories.length,
+        itemBuilder: (context, index) {
+          final cat = pp.categories[index];
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CategoryProductsScreen(
+                  categoryId: cat.id,
+                  categoryName: cat.name,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: primary, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: cat.image != null
+                        ? AppNetworkImage(
+                            imageUrl: '${ApiConfig.imageBaseUrl}${cat.image}',
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) =>
+                                Icon(Icons.eco, color: primary),
+                          )
+                        : Icon(Icons.eco, color: primary),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  cat.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPromoStrip(BuildContext context) {
+    if (!ShopConfig.promoBannerEnabled) return const SizedBox.shrink();
+    final color = ShopConfig.promoBannerColor;
+    return GestureDetector(
+      onTap: () => _openPromoLink(context),
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: color,
+          gradient: LinearGradient(
+            colors: [color, Color.lerp(color, Colors.white, .18) ?? color],
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: Colors.white,
+              size: 27,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                ShopConfig.promoBannerTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductSection(
+    BuildContext context, {
+    required String title,
+    required List<Product> products,
+    required bool loading,
+    bool grid = false,
+    int rows = 1,
+  }) {
+    if (!loading && products.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (loading && products.isEmpty)
+      return SliverToBoxAdapter(
+        child: SizedBox(
+          height: 230,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: 3,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, __) => SizedBox(width: 158, child: _shimmerCard()),
+          ),
+        ),
+      );
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ProductSearchScreen(),
+              ),
+            ),
+            child: const Text('View all'),
+          ),
+        ],
+      ),
+    );
+
+    if (grid) {
+      // Grid: 2 items per row, `rows` rows total.
+      final rowCount = rows.clamp(1, 6);
+      final visible = products.take(rowCount * 2).toList();
+      final cards = visible
+          .map((product) => ProductCard(
+                product: product,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(product: product),
+                  ),
+                ),
+              ))
+          .toList();
+      return SliverToBoxAdapter(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                childAspectRatio: 0.62,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                children: cards,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Carousel: stack `rows` horizontal lists vertically.
+    final rowCount = rows.clamp(1, 6);
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          ...List.generate(rowCount, (rowIndex) {
+            final start = rowIndex * 6;
+            final end = (start + 6).clamp(0, products.length);
+            final rowProducts = products.sublist(start, end);
+            return SizedBox(
+              height: 290,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: rowProducts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, index) => SizedBox(
+                  width: 158,
+                  child: ProductCard(
+                    product: rowProducts[index],
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ProductDetailScreen(product: rowProducts[index]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServicesSection(BuildContext context) {
+    final services = context.watch<ProductProvider>().services;
+    if (services.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    final primary = Theme.of(context).colorScheme.primary;
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 22, 18, 10),
+            child: Text(
+              'Orchard Services',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            ),
+          ),
+          SizedBox(
+            height: 116,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: services.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final service = services[index];
+                return GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ServiceDetailScreen(service: service),
+                    ),
+                  ),
+                  child: Container(
+                    width: 190,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: .08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: service.image != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: AppNetworkImage(
+                                    imageUrl:
+                                        '${ApiConfig.imageBaseUrl}${service.image}',
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Icon(Icons.eco, color: primary),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            service.name,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legacyBuild(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final tabs = [
       const _HomeTab(),
-      const _CategoriesTab(),
+      const ReelsScreen(),
       const _ServicesTab(),
       const _CartTab(),
       const _ProfileTab(),
@@ -59,25 +1400,30 @@ class _HomeScreenState extends State<HomeScreen> {
         indicatorColor: primary.withValues(alpha: 0.2),
         destinations: [
           NavigationDestination(
-              icon: const Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home, color: primary),
-              label: 'Home'),
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: primary),
+            label: 'Home',
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.category_outlined),
-              selectedIcon: Icon(Icons.category, color: primary),
-              label: 'Categories'),
+            icon: const Icon(Icons.slow_motion_video_outlined),
+            selectedIcon: Icon(Icons.slow_motion_video, color: primary),
+            label: 'Reels',
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.construction_outlined),
-              selectedIcon: Icon(Icons.construction, color: primary),
-              label: 'Services'),
+            icon: const Icon(Icons.construction_outlined),
+            selectedIcon: Icon(Icons.construction, color: primary),
+            label: 'Services',
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.shopping_cart_outlined),
-              selectedIcon: Icon(Icons.shopping_cart, color: primary),
-              label: 'Cart'),
+            icon: const Icon(Icons.shopping_cart_outlined),
+            selectedIcon: Icon(Icons.shopping_cart, color: primary),
+            label: 'Cart',
+          ),
           NavigationDestination(
-              icon: const Icon(Icons.person_outlined),
-              selectedIcon: Icon(Icons.person, color: primary),
-              label: 'Profile'),
+            icon: const Icon(Icons.person_outlined),
+            selectedIcon: Icon(Icons.person, color: primary),
+            label: 'Profile',
+          ),
         ],
       ),
     );
@@ -149,8 +1495,10 @@ class _HomeTabState extends State<_HomeTab> {
   Future<void> _fetchLatest() async {
     setState(() => _loadingLatest = true);
     try {
-      final response = await ApiService.get('/products',
-          queryParams: {'sort_by': 'newest', 'page': '1'});
+      final response = await ApiService.get(
+        '/products',
+        queryParams: {'sort_by': 'newest', 'page': '1'},
+      );
       final envelope = response['data'];
       List<dynamic> items;
       if (envelope is Map && envelope.containsKey('data')) {
@@ -187,8 +1535,7 @@ class _HomeTabState extends State<_HomeTab> {
             if (context.mounted) {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const ProductSearchScreen()),
+                MaterialPageRoute(builder: (_) => const ProductSearchScreen()),
               );
             }
             return;
@@ -245,9 +1592,13 @@ class _HomeTabState extends State<_HomeTab> {
                   children: [
                     const Icon(Icons.eco, color: Colors.white, size: 22),
                     const SizedBox(width: 8),
-                    Text('Magray Orchards',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, color: Colors.white)),
+                    Text(
+                      'Magray Orchards',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                     if (auth.user?.isProMember == true) ...[
                       const SizedBox(width: 8),
                       const ProMemberBadge(isProMember: true, compact: true),
@@ -262,7 +1613,8 @@ class _HomeTabState extends State<_HomeTab> {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const ProductSearchScreen()),
+                    builder: (_) => const ProductSearchScreen(),
+                  ),
                 ),
               ),
             ],
@@ -278,29 +1630,47 @@ class _HomeTabState extends State<_HomeTab> {
                   onTap: _openStore,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     child: Row(
                       children: [
-                        Icon(Icons.system_update_alt, color: Colors.amber.shade800, size: 20),
+                        Icon(
+                          Icons.system_update_alt,
+                          color: Colors.amber.shade800,
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
                             'A new version is available. Update for the latest features.',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                         GestureDetector(
                           onTap: _openStore,
-                          child: Text('Update',
-                              style: TextStyle(
-                                  color: Colors.amber.shade900,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13)),
+                          child: Text(
+                            'Update',
+                            style: TextStyle(
+                              color: Colors.amber.shade900,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () => setState(() => _dismissedSoftUpdate = true),
-                          child: Icon(Icons.close, size: 18, color: Colors.grey.shade600),
+                          onTap: () =>
+                              setState(() => _dismissedSoftUpdate = true),
+                          child: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
@@ -318,9 +1688,11 @@ class _HomeTabState extends State<_HomeTab> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.campaign,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
-                      size: 16),
+                  Icon(
+                    Icons.campaign,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    size: 16,
+                  ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
@@ -328,11 +1700,12 @@ class _HomeTabState extends State<_HomeTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSecondaryContainer,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSecondaryContainer,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -407,16 +1780,22 @@ class _HomeTabState extends State<_HomeTab> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(banner.title!,
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold)),
+                                      Text(
+                                        banner.title!,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       if (banner.subtitle != null)
-                                        Text(banner.subtitle!,
-                                            style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 12)),
+                                        Text(
+                                          banner.subtitle!,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -468,8 +1847,10 @@ class _HomeTabState extends State<_HomeTab> {
                                 color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.workspace_premium,
-                                  color: Colors.white),
+                              child: const Icon(
+                                Icons.workspace_premium,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -481,9 +1862,10 @@ class _HomeTabState extends State<_HomeTab> {
                                         ? '${planName ?? 'Pro'} Member'
                                         : 'Go Pro with Magray Orchards',
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700),
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
@@ -491,9 +1873,11 @@ class _HomeTabState extends State<_HomeTab> {
                                         ? 'You\'re enjoying premium perks'
                                         : 'Free delivery, fast support & premium content',
                                     style: TextStyle(
-                                        color: Colors.white.withValues(
-                                            alpha: 0.85),
-                                        fontSize: 12),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -509,26 +1893,28 @@ class _HomeTabState extends State<_HomeTab> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) => const LoginScreen()),
+                                    builder: (_) => const LoginScreen(),
+                                  ),
                                 );
                                 return;
                               }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) =>
-                                        const SubscriptionScreen()),
+                                  builder: (_) => const SubscriptionScreen(),
+                                ),
                               );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: primaryDark,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
-                            child: Text(isPro
-                                ? 'Manage Subscription'
-                                : 'Explore Plans'),
+                            child: Text(
+                              isPro ? 'Manage Subscription' : 'Explore Plans',
+                            ),
                           ),
                         ),
                       ],
@@ -581,28 +1967,34 @@ class _HomeTabState extends State<_HomeTab> {
                                 ),
                                 child: cat.image != null
                                     ? ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(16),
                                         child: AppNetworkImage(
                                           imageUrl:
                                               '${ApiConfig.imageBaseUrl}${cat.image}',
                                           fit: BoxFit.cover,
-                                          errorWidget: (_, __, ___) =>
-                                              Icon(Icons.category,
-                                                  color: primary),
+                                          errorWidget: (_, __, ___) => Icon(
+                                            Icons.category,
+                                            color: primary,
+                                          ),
                                         ),
                                       )
-                                    : Icon(Icons.category,
-                                        color: primary, size: 32),
+                                    : Icon(
+                                        Icons.category,
+                                        color: primary,
+                                        size: 32,
+                                      ),
                               ),
                               const SizedBox(height: 8),
-                              Text(cat.name,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center),
+                              Text(
+                                cat.name,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                         ),
@@ -655,33 +2047,41 @@ class _HomeTabState extends State<_HomeTab> {
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                          color: Theme.of(context).dividerColor),
+                                        color: Theme.of(context).dividerColor,
+                                      ),
                                     ),
                                     child: brand.logo != null
                                         ? ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(16),
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
                                             child: AppNetworkImage(
                                               imageUrl:
                                                   '${ApiConfig.imageBaseUrl}${brand.logo}',
                                               fit: BoxFit.contain,
                                               errorWidget: (_, __, ___) => Icon(
-                                                  Icons.business,
-                                                  color: primary),
+                                                Icons.business,
+                                                color: primary,
+                                              ),
                                               placeholder: (_, __) => Icon(
-                                                  Icons.business,
-                                                  color: primary),
+                                                Icons.business,
+                                                color: primary,
+                                              ),
                                             ),
                                           )
-                                        : Icon(Icons.business,
-                                            color: primary, size: 30),
+                                        : Icon(
+                                            Icons.business,
+                                            color: primary,
+                                            size: 30,
+                                          ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     brand.name,
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.center,
@@ -745,8 +2145,10 @@ class _HomeTabState extends State<_HomeTab> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(
-                                  product: pp.offerProducts[index])),
+                            builder: (_) => ProductDetailScreen(
+                              product: pp.offerProducts[index],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -770,9 +2172,10 @@ class _HomeTabState extends State<_HomeTab> {
                       end: Alignment.bottomRight,
                       colors: [
                         Color.lerp(
-                                ShopConfig.promoBannerColor,
-                                Colors.black,
-                                0.15) ??
+                              ShopConfig.promoBannerColor,
+                              Colors.black,
+                              0.15,
+                            ) ??
                             ShopConfig.promoBannerColor,
                         ShopConfig.promoBannerColor,
                       ],
@@ -784,24 +2187,33 @@ class _HomeTabState extends State<_HomeTab> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.4)),
+                            color: Colors.white.withValues(alpha: 0.4),
+                          ),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.local_fire_department,
-                                color: Colors.white, size: 14),
+                            Icon(
+                              Icons.local_fire_department,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                             SizedBox(width: 4),
-                            Text('Limited Time Offer',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              'Limited Time Offer',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -820,8 +2232,9 @@ class _HomeTabState extends State<_HomeTab> {
                         Text(
                           ShopConfig.promoBannerSubtitle,
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 13),
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 14),
@@ -833,7 +2246,8 @@ class _HomeTabState extends State<_HomeTab> {
                             backgroundColor: Colors.white,
                             foregroundColor: ShopConfig.promoBannerColor,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           child: const Text('Shop Offers'),
                         ),
@@ -860,7 +2274,8 @@ class _HomeTabState extends State<_HomeTab> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: 6,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (_, __) => SizedBox(width: 160, child: _shimmerCard()),
+                      itemBuilder: (_, __) =>
+                          SizedBox(width: 160, child: _shimmerCard()),
                     ),
                   ),
                 );
@@ -873,16 +2288,26 @@ class _HomeTabState extends State<_HomeTab> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.cloud_off, size: 40, color: Colors.grey[400]),
+                          Icon(
+                            Icons.cloud_off,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             pp.errorMessage!,
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           TextButton.icon(
-                            onPressed: () { pp.clearError(); pp.fetchProducts(isFeatured: true, page: 1); },
+                            onPressed: () {
+                              pp.clearError();
+                              pp.fetchProducts(isFeatured: true, page: 1);
+                            },
                             icon: const Icon(Icons.refresh, size: 18),
                             label: const Text('Retry'),
                           ),
@@ -897,8 +2322,11 @@ class _HomeTabState extends State<_HomeTab> {
                   child: Padding(
                     padding: EdgeInsets.all(32),
                     child: Center(
-                        child: Text('No products available',
-                            style: TextStyle(color: Colors.grey))),
+                      child: Text(
+                        'No products available',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ),
                 );
               }
@@ -910,19 +2338,20 @@ class _HomeTabState extends State<_HomeTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: pp.featuredProducts.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) =>
-                        SizedBox(
-                          width: 160,
-                          child: ProductCard(
-                            product: pp.featuredProducts[index],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ProductDetailScreen(
-                                      product: pp.featuredProducts[index])),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 160,
+                      child: ProductCard(
+                        product: pp.featuredProducts[index],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProductDetailScreen(
+                              product: pp.featuredProducts[index],
                             ),
                           ),
                         ),
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -937,8 +2366,7 @@ class _HomeTabState extends State<_HomeTab> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 0.62,
                   crossAxisSpacing: 12,
@@ -955,41 +2383,42 @@ class _HomeTabState extends State<_HomeTab> {
               child: Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(
-                    child: Text('No products available',
-                        style: TextStyle(color: Colors.grey))),
+                  child: Text(
+                    'No products available',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
               ),
             )
           else
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 0.62,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      ProductCard(
-                        product: _latestProducts[index],
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(
-                                  product: _latestProducts[index])),
+                  (context, index) => ProductCard(
+                    product: _latestProducts[index],
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductDetailScreen(
+                          product: _latestProducts[index],
                         ),
                       ),
+                    ),
+                  ),
                   childCount: _latestProducts.length,
                 ),
               ),
             ),
 
           // ── 10. Our Services ──
-          const SliverToBoxAdapter(
-            child: SectionHeader(title: 'Our Services'),
-          ),
+          const SliverToBoxAdapter(child: SectionHeader(title: 'Our Services')),
           Consumer<ProductProvider>(
             builder: (context, pp, _) {
               if (pp.services.isEmpty) {
@@ -1008,8 +2437,8 @@ class _HomeTabState extends State<_HomeTab> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ServiceDetailScreen(
-                                service: service),
+                            builder: (_) =>
+                                ServiceDetailScreen(service: service),
                           ),
                         ),
                         child: Container(
@@ -1017,7 +2446,8 @@ class _HomeTabState extends State<_HomeTab> {
                           margin: const EdgeInsets.symmetric(horizontal: 4),
                           child: Card(
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Column(
@@ -1032,35 +2462,44 @@ class _HomeTabState extends State<_HomeTab> {
                                     ),
                                     child: service.image != null
                                         ? ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             child: AppNetworkImage(
                                               imageUrl:
                                                   '${ApiConfig.imageBaseUrl}${service.image}',
                                               fit: BoxFit.cover,
-                                              errorWidget: (_, __, ___) =>
-                                                  Icon(Icons.construction,
-                                                      color: primary),
+                                              errorWidget: (_, __, ___) => Icon(
+                                                Icons.construction,
+                                                color: primary,
+                                              ),
                                             ),
                                           )
-                                        : Icon(Icons.construction,
-                                            color: primary),
+                                        : Icon(
+                                            Icons.construction,
+                                            color: primary,
+                                          ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(service.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center),
+                                  Text(
+                                    service.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
                                   const SizedBox(height: 4),
                                   Text(
-                                      'Rs. ${service.basePrice.toStringAsFixed(0)}',
-                                      style: TextStyle(
-                                          color: primary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12)),
+                                    'Rs. ${service.basePrice.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      color: primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1075,9 +2514,7 @@ class _HomeTabState extends State<_HomeTab> {
           ),
 
           // ── 11. How It Works ──
-          const SliverToBoxAdapter(
-            child: SectionHeader(title: 'How It Works'),
-          ),
+          const SliverToBoxAdapter(child: SectionHeader(title: 'How It Works')),
           SliverToBoxAdapter(
             child: SizedBox(
               height: 170,
@@ -1119,10 +2556,7 @@ class _HomeTabState extends State<_HomeTab> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      primary,
-                      primaryDark,
-                    ],
+                    colors: [primary, primaryDark],
                   ),
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -1132,17 +2566,19 @@ class _HomeTabState extends State<_HomeTab> {
                     const Text(
                       'Ready to Transform Your Orchard?',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700),
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Premium products and expert services for healthier orchards',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 13),
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
@@ -1164,7 +2600,8 @@ class _HomeTabState extends State<_HomeTab> {
                               backgroundColor: Colors.white,
                               foregroundColor: primary,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                             child: const Text('Shop Now'),
                           ),
@@ -1185,7 +2622,8 @@ class _HomeTabState extends State<_HomeTab> {
                               foregroundColor: Colors.white,
                               side: const BorderSide(color: Colors.white),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                             child: const Text('Explore Services'),
                           ),
@@ -1254,28 +2692,37 @@ class _HowItWorksCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Center(
-                  child: Text('$step',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15)),
+                  child: Text(
+                    '$step',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
               Icon(icon, color: primary, size: 24),
               const SizedBox(height: 6),
-              Text(title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 3),
-              Text(desc,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                desc,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -1311,8 +2758,7 @@ class _CategoriesTabState extends State<_CategoriesTab> {
       body: Consumer<ProductProvider>(
         builder: (context, pp, _) {
           if (pp.isLoading && pp.categories.isEmpty) {
-            return Center(
-                child: CircularProgressIndicator(color: primary));
+            return Center(child: CircularProgressIndicator(color: primary));
           }
           if (pp.categories.isEmpty) {
             return const Center(
@@ -1321,16 +2767,17 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                 children: [
                   Icon(Icons.category_outlined, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('No categories available',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text(
+                    'No categories available',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
                 ],
               ),
             );
           }
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               childAspectRatio: 1.1,
               crossAxisSpacing: 12,
@@ -1351,7 +2798,8 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                 ),
                 child: Card(
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1373,16 +2821,20 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                                       Icon(Icons.category, color: primary),
                                 ),
                               )
-                            : Icon(Icons.category,
-                                color: primary, size: 32),
+                            : Icon(Icons.category, color: primary, size: 32),
                       ),
                       const SizedBox(height: 8),
-                      Text(cat.name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500)),
-                      Text('${cat.productCount} products',
-                          style: const TextStyle(
-                              color: Colors.grey, fontSize: 12)),
+                      Text(
+                        cat.name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      Text(
+                        '${cat.productCount} products',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1422,19 +2874,23 @@ class _ServicesTabState extends State<_ServicesTab> {
       body: Consumer<ProductProvider>(
         builder: (context, pp, _) {
           if (pp.isLoading && pp.services.isEmpty) {
-            return Center(
-                child: CircularProgressIndicator(color: primary));
+            return Center(child: CircularProgressIndicator(color: primary));
           }
           if (pp.services.isEmpty) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.construction_outlined,
-                      size: 80, color: Colors.grey),
+                  Icon(
+                    Icons.construction_outlined,
+                    size: 80,
+                    color: Colors.grey,
+                  ),
                   SizedBox(height: 16),
-                  Text('No services available',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text(
+                    'No services available',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
                 ],
               ),
             );
@@ -1447,7 +2903,8 @@ class _ServicesTabState extends State<_ServicesTab> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(16),
                   leading: Container(
@@ -1465,33 +2922,39 @@ class _ServicesTabState extends State<_ServicesTab> {
                                   '${ApiConfig.imageBaseUrl}${service.image}',
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) =>
-                                  Icon(Icons.construction,
-                                      color: primary),
+                                  Icon(Icons.construction, color: primary),
                             ),
                           )
                         : Icon(Icons.construction, color: primary),
                   ),
-                  title: Text(service.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(
+                    service.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text(service.description ?? '',
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(
+                        service.description ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 4),
                       Text(
-                          'Rs. ${service.basePrice.toStringAsFixed(0)}${service.priceUnit != null ? '/${service.priceUnit}' : ''}',
-                          style: TextStyle(
-                              color: primary, fontWeight: FontWeight.bold)),
+                        'Rs. ${service.basePrice.toStringAsFixed(0)}${service.priceUnit != null ? '/${service.priceUnit}' : ''}',
+                        style: TextStyle(
+                          color: primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ServiceDetailScreen(service: service),
+                      builder: (_) => ServiceDetailScreen(service: service),
                     ),
                   ),
                 ),
@@ -1542,10 +3005,14 @@ class _CartTabState extends State<_CartTab> {
       if (mounted) setState(() => _shippingResult = data);
     } catch (e) {
       if (mounted) {
-        setState(() => _shippingResult = {
-          'serviceable': false,
-          'message': e is ApiException ? e.message : 'Could not check delivery',
-        });
+        setState(
+          () => _shippingResult = {
+            'serviceable': false,
+            'message': e is ApiException
+                ? e.message
+                : 'Could not check delivery',
+          },
+        );
       }
     }
     if (mounted) setState(() => _shippingLoading = false);
@@ -1563,14 +3030,21 @@ class _CartTabState extends State<_CartTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_cart_outlined,
-                size: 80, color: Colors.grey[300]),
+            Icon(
+              Icons.shopping_cart_outlined,
+              size: 80,
+              color: Colors.grey[300],
+            ),
             const SizedBox(height: 16),
-            const Text('Your cart is empty',
-                style: TextStyle(fontSize: 18, color: Colors.grey)),
+            const Text(
+              'Your cart is empty',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
             const SizedBox(height: 8),
-            const Text('Browse products and add items',
-                style: TextStyle(color: Colors.grey)),
+            const Text(
+              'Browse products and add items',
+              style: TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -1610,13 +3084,19 @@ class _CartTabState extends State<_CartTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Cart (${cart.itemCount} items)',
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(
+                'Cart (${cart.itemCount} items)',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               TextButton(
                 onPressed: () => cart.clearCart(),
-                child: const Text('Clear All',
-                    style: TextStyle(color: Colors.red)),
+                child: const Text(
+                  'Clear All',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),
@@ -1643,15 +3123,19 @@ class _CartTabState extends State<_CartTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle,
-                        color: Colors.green, size: 16),
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 16,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'You\'ve unlocked free delivery!',
                       style: TextStyle(
-                          color: Colors.green[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
+                        color: Colors.green[700],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 )
@@ -1659,7 +3143,10 @@ class _CartTabState extends State<_CartTab> {
                 Text(
                   'Add Rs. ${amountNeeded.toStringAsFixed(0)} more for free delivery!',
                   style: TextStyle(
-                      color: primary, fontSize: 12, fontWeight: FontWeight.w600),
+                    color: primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
             ],
           ),
@@ -1674,7 +3161,8 @@ class _CartTabState extends State<_CartTab> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -1704,36 +3192,53 @@ class _CartTabState extends State<_CartTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.product.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
                             Text(
-                                'Rs. ${item.product.price.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                    color: primary,
-                                    fontWeight: FontWeight.bold)),
+                              item.product.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Rs. ${item.product.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                color: primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.remove_circle_outline,
-                                size: 24),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 24,
+                            ),
                             onPressed: () => cart.updateQuantity(
-                                item.product.id, item.quantity - 1),
+                              item.product.id,
+                              item.quantity - 1,
+                            ),
                           ),
-                          Text('${item.quantity}',
-                              style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold)),
+                          Text(
+                            '${item.quantity}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           IconButton(
-                            icon: Icon(Icons.add_circle_outline,
-                                size: 24, color: primary),
+                            icon: Icon(
+                              Icons.add_circle_outline,
+                              size: 24,
+                              color: primary,
+                            ),
                             onPressed: () => cart.updateQuantity(
-                                item.product.id, item.quantity + 1),
+                              item.product.id,
+                              item.quantity + 1,
+                            ),
                           ),
                         ],
                       ),
@@ -1771,8 +3276,11 @@ class _CartTabState extends State<_CartTab> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.location_on_outlined,
-                                size: 16, color: primary),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 16,
+                              color: primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Delivering to ${_pincodeController.text}',
@@ -1785,11 +3293,14 @@ class _CartTabState extends State<_CartTab> {
                             _usingDefaultPincode = false;
                             _shippingResult = null;
                           }),
-                          child: Text('Change',
-                              style: TextStyle(
-                                  color: primary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600)),
+                          child: Text(
+                            'Change',
+                            style: TextStyle(
+                              color: primary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1809,10 +3320,12 @@ class _CartTabState extends State<_CartTab> {
                               counterText: '',
                               isDense: true,
                               prefixIcon: const Icon(
-                                  Icons.location_on_outlined,
-                                  size: 18),
+                                Icons.location_on_outlined,
+                                size: 18,
+                              ),
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ),
@@ -1823,14 +3336,16 @@ class _CartTabState extends State<_CartTab> {
                             onPressed: _shippingLoading
                                 ? null
                                 : () => _fetchShipping(
-                                    _pincodeController.text.trim()),
+                                    _pincodeController.text.trim(),
+                                  ),
                             child: _shippingLoading
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white),
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
                                 : const Text('Check'),
                           ),
@@ -1844,8 +3359,10 @@ class _CartTabState extends State<_CartTab> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Shipping',
-                            style: TextStyle(color: Colors.grey, fontSize: 14)),
+                        const Text(
+                          'Shipping',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
                         if (_shippingResult!['serviceable'] == true)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1855,17 +3372,20 @@ class _CartTabState extends State<_CartTab> {
                                     ? 'Free'
                                     : 'Rs. ${(_shippingResult!['delivery_charge'] ?? 0).toStringAsFixed(0)}',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        _shippingResult!['free_delivery'] == true
-                                            ? Colors.green
-                                            : null),
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      _shippingResult!['free_delivery'] == true
+                                      ? Colors.green
+                                      : null,
+                                ),
                               ),
                               if (_shippingResult!['estimated_days'] != null)
                                 Text(
                                   'Est. ${_shippingResult!['estimated_days']} days',
                                   style: const TextStyle(
-                                      color: Colors.grey, fontSize: 11),
+                                    color: Colors.grey,
+                                    fontSize: 11,
+                                  ),
                                 ),
                             ],
                           )
@@ -1875,7 +3395,9 @@ class _CartTabState extends State<_CartTab> {
                               _shippingResult!['message']?.toString() ??
                                   'Not serviceable',
                               style: const TextStyle(
-                                  color: Colors.red, fontSize: 12),
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
                               textAlign: TextAlign.right,
                             ),
                           ),
@@ -1886,14 +3408,21 @@ class _CartTabState extends State<_CartTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Rs. ${cart.total.toStringAsFixed(0)}',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: primary)),
+                    const Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Rs. ${cart.total.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primary,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -1912,7 +3441,8 @@ class _CartTabState extends State<_CartTab> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const LoginScreen()),
+                            builder: (_) => const LoginScreen(),
+                          ),
                         );
                         return;
                       }
@@ -1921,14 +3451,14 @@ class _CartTabState extends State<_CartTab> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: Text(
                       auth.isLoggedIn
                           ? 'Proceed to Checkout'
                           : 'Login to Checkout',
-                      style: const TextStyle(
-                          fontSize: 16, color: Colors.white),
+                      style: const TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ),
                 ),
@@ -1965,11 +3495,14 @@ class _ProfileTab extends StatelessWidget {
               child: const Icon(Icons.person, size: 50, color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            const Text('Guest',
-                style:
-                    TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Text('Login to access your account',
-                style: TextStyle(color: Colors.grey)),
+            const Text(
+              'Guest',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'Login to access your account',
+              style: TextStyle(color: Colors.grey),
+            ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -1982,10 +3515,13 @@ class _ProfileTab extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('Login',
-                    style: TextStyle(fontSize: 16, color: Colors.white)),
+                child: const Text(
+                  'Login',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1995,16 +3531,18 @@ class _ProfileTab extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const RegisterScreen()),
+                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: primary),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: Text('Create Account',
-                    style: TextStyle(fontSize: 16, color: primary)),
+                child: Text(
+                  'Create Account',
+                  style: TextStyle(fontSize: 16, color: primary),
+                ),
               ),
             ),
           ],
@@ -2029,17 +3567,20 @@ class _ProfileTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(user?.name ?? '',
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(
+                user?.name ?? '',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               if (user?.isProMember == true) ...[
                 const SizedBox(width: 8),
                 const ProMemberBadge(isProMember: true, compact: true),
               ],
             ],
           ),
-          Text(user?.email ?? '',
-              style: const TextStyle(color: Colors.grey)),
+          Text(user?.email ?? '', style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 24),
           AppCard(
             padding: EdgeInsets.zero,
@@ -2052,7 +3593,8 @@ class _ProfileTab extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const EditProfileScreen()),
+                      builder: (_) => const EditProfileScreen(),
+                    ),
                   ),
                 ),
                 const Divider(indent: 52),
@@ -2063,7 +3605,8 @@ class _ProfileTab extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const SubscriptionScreen()),
+                      builder: (_) => const SubscriptionScreen(),
+                    ),
                   ),
                 ),
                 const Divider(indent: 52),
@@ -2084,8 +3627,7 @@ class _ProfileTab extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const MyBookingsScreen()),
+                    MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
                   ),
                 ),
                 const Divider(indent: 52),
@@ -2128,8 +3670,7 @@ class _ProfileTab extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => auth.logout(),
               icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text('Logout',
-                  style: TextStyle(color: Colors.red)),
+              label: const Text('Logout', style: TextStyle(color: Colors.red)),
             ),
           ),
           const SizedBox(height: 16),

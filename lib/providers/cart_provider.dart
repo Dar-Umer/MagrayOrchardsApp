@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 
@@ -12,6 +14,8 @@ class CartItem {
 
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
+
+  static const String _storageKey = 'local_cart_v1';
 
   List<CartItem> get items => _items;
   int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
@@ -33,6 +37,7 @@ class CartProvider extends ChangeNotifier {
       _items.add(CartItem(product: product, quantity: quantity));
     }
     if (isLoggedIn) _syncAddToServer(product.id, quantity);
+    _persistLocal();
     notifyListeners();
   }
 
@@ -43,6 +48,7 @@ class CartProvider extends ChangeNotifier {
       _syncRemoveFromServer(item.serverId!);
     }
     _items.removeWhere((item) => item.product.id == productId);
+    _persistLocal();
     notifyListeners();
   }
 
@@ -58,6 +64,7 @@ class CartProvider extends ChangeNotifier {
       if (isLoggedIn && _items[index].serverId != null) {
         _syncUpdateOnServer(_items[index].serverId!, quantity);
       }
+      _persistLocal();
       notifyListeners();
     }
   }
@@ -73,7 +80,55 @@ class CartProvider extends ChangeNotifier {
       }
     }
     _items.clear();
+    _persistLocal();
     notifyListeners();
+  }
+
+  /// Restore a guest cart saved locally (survives app close / reload).
+  Future<void> loadFromLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_storageKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = json.decode(raw);
+      if (decoded is! List) return;
+      final restored = <CartItem>[];
+      for (final entry in decoded) {
+        if (entry is! Map) continue;
+        final productData = entry['product'];
+        final quantity = entry['quantity'] ?? 1;
+        final serverId = entry['server_id'];
+        if (productData is Map) {
+          restored.add(CartItem(
+            product: Product.fromJson(Map<String, dynamic>.from(productData)),
+            quantity: quantity is num ? quantity.toInt() : 1,
+            serverId: serverId?.toString(),
+          ));
+        }
+      }
+      if (restored.isNotEmpty) {
+        _items
+          ..clear()
+          ..addAll(restored);
+        notifyListeners();
+      }
+    } catch (_) {
+      // Ignore corrupt local cart data.
+    }
+  }
+
+  Future<void> _persistLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = _items
+          .map((item) => {
+                'product': item.product.toJson(),
+                'quantity': item.quantity,
+                'server_id': item.serverId,
+              })
+          .toList();
+      await prefs.setString(_storageKey, json.encode(data));
+    } catch (_) {}
   }
 
   int getQuantity(int productId) {
