@@ -33,6 +33,14 @@ class ShopConfig {
       'We are currently under maintenance. Please check back soon.';
   static String _maintenanceUntil = '';
 
+  // Firebase (FCM) app config — fetched from /api/config, used by PushService.
+  static String _firebaseApiKey = '';
+  static String _firebaseAppId = '';
+  static String _firebaseMessagingSenderId = '';
+  static String _firebaseProjectId = '';
+  static String _firebaseAuthDomain = '';
+  static String _firebaseStorageBucket = '';
+
   // App home page layout (ordered, admin-configurable).
   static List<HomeSection> _homeSections = const [];
 
@@ -94,6 +102,19 @@ class ShopConfig {
   static String get maintenanceMessage => _maintenanceMessage;
   static String get maintenanceUntil => _maintenanceUntil;
 
+  static String get firebaseApiKey => _firebaseApiKey;
+  static String get firebaseAppId => _firebaseAppId;
+  static String get firebaseMessagingSenderId => _firebaseMessagingSenderId;
+  static String get firebaseProjectId => _firebaseProjectId;
+  static String get firebaseAuthDomain => _firebaseAuthDomain;
+  static String get firebaseStorageBucket => _firebaseStorageBucket;
+
+  /// Whether the server provided a complete Firebase config for this app.
+  static bool get firebaseConfigured =>
+      _firebaseApiKey.isNotEmpty &&
+      _firebaseAppId.isNotEmpty &&
+      _firebaseProjectId.isNotEmpty;
+
   /// Ordered home sections. Falls back to the built-in default layout when
   /// the admin has not saved a layout (or the payload is empty).
   static List<HomeSection> get homeSections =>
@@ -145,6 +166,16 @@ class ShopConfig {
       _maintenanceEnabled = (data['mobile_app_maintenance_enabled'] as bool?) ?? false;
       _maintenanceMessage = (data['mobile_app_maintenance_message'] as String?) ?? _maintenanceMessage;
       _maintenanceUntil = (data['mobile_app_maintenance_until'] as String?) ?? '';
+
+      final firebase = data['firebase'];
+      if (firebase is Map) {
+        _firebaseApiKey = (firebase['api_key'] as String?) ?? '';
+        _firebaseAppId = (firebase['app_id'] as String?) ?? '';
+        _firebaseMessagingSenderId = (firebase['messaging_sender_id'] as String?) ?? '';
+        _firebaseProjectId = (firebase['project_id'] as String?) ?? '';
+        _firebaseAuthDomain = (firebase['auth_domain'] as String?) ?? '';
+        _firebaseStorageBucket = (firebase['storage_bucket'] as String?) ?? '';
+      }
 
       final layout = HomeLayout.fromJson(data['home_layout']);
       _homeSections = layout.sections;

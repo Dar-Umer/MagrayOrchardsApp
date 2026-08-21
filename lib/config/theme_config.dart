@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class ThemeConfig {
   ThemeConfig._();
@@ -139,7 +140,7 @@ class ThemeConfig {
 
     final baseText = TextStyle(fontFamily: fontFamily, color: textPrimary);
 
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: surface,
@@ -345,6 +346,15 @@ class ThemeConfig {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
+
+    final textTheme = switch (fontFamily) {
+      'Poppins' => GoogleFonts.poppinsTextTheme(base.textTheme),
+      'Roboto' => GoogleFonts.robotoTextTheme(base.textTheme),
+      'Playfair Display' => GoogleFonts.playfairDisplayTextTheme(base.textTheme),
+      _ => GoogleFonts.interTextTheme(base.textTheme),
+    };
+
+    return base.copyWith(textTheme: textTheme);
   }
 
   // Convenience accessors used by screens (single source of truth).
@@ -353,6 +363,7 @@ class ThemeConfig {
   static Color get goldSoft => premiumGoldSoft;
   static Color get green => premiumGreen;
   static Color get greenDeep => premiumGreenDeep;
+  static Color get greenSoft => premiumGreenSoft;
   static Color get ivory => premiumIvory;
   static Color get taupe => premiumTaupe;
   static Color get border => premiumBorder;

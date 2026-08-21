@@ -10,28 +10,49 @@ import '../services/api_service.dart';
 import '../services/shop_config.dart';
 
 class OrderDetailScreen extends StatefulWidget {
-  final Order order;
+  final Order? order;
+  final int? orderId;
 
-  const OrderDetailScreen({super.key, required this.order});
+  const OrderDetailScreen({super.key, this.order, this.orderId});
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  late Order _order;
+  late Order? _order;
+
+  /// Non-null accessor used after [build] has verified the order exists.
+  Order get _o => _order!;
+
   bool _loadingDetail = false;
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
-    _fetchFresh();
+    if (_order == null && widget.orderId != null) {
+      _fetchByOrderId(widget.orderId!);
+    } else {
+      _fetchFresh();
+    }
+  }
+
+  Future<void> _fetchByOrderId(int id) async {
+    setState(() => _loadingDetail = true);
+    final fetched = await context.read<OrderProvider>().fetchOrderDetail(id);
+    if (mounted) {
+      setState(() {
+        _order = fetched;
+        _loadingDetail = false;
+      });
+    }
   }
 
   Future<void> _fetchFresh() async {
+    if (_order == null) return;
     setState(() => _loadingDetail = true);
-    final fresh = await context.read<OrderProvider>().fetchOrderDetail(_order.id);
+    final fresh = await context.read<OrderProvider>().fetchOrderDetail(_order!.id);
     if (mounted && fresh != null) {
       setState(() { _order = fresh; _loadingDetail = false; });
     } else if (mounted) {
@@ -111,8 +132,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   ];
 
   bool get _canCancel {
-    if (_order.status != 'pending') return false;
-    final shipment = _order.shipment;
+    if (_o.status != 'pending') return false;
+    final shipment = _o.shipment;
     if (shipment == null) return true;
     final status = (shipment['status'] as String?) ?? '';
     return status.isEmpty || _cancellableShipmentStatuses.contains(status);
@@ -193,7 +214,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Cancellation'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text('Cancel order ${_order.orderNumber}? Refund will be processed to your $refundMethod method.'),
+        content: Text('Cancel order ${_o.orderNumber}? Refund will be processed to your $refundMethod method.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
           ElevatedButton(
@@ -208,37 +229,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (confirmed != true) return;
 
     try {
-      await ApiService.patch('/orders/${_order.id}/cancel', body: {'refund_method': refundMethod, 'cancellation_reason': reason});
+      await ApiService.patch('/orders/${_o.id}/cancel', body: {'refund_method': refundMethod, 'cancellation_reason': reason});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: const Text('Order cancelled successfully'), backgroundColor: Theme.of(context).colorScheme.primary),
         );
         setState(() {
           _order = Order(
-            id: _order.id,
-            orderNumber: _order.orderNumber,
-            type: _order.type,
+            id: _o.id,
+            orderNumber: _o.orderNumber,
+            type: _o.type,
             status: 'cancelled',
-            subtotal: _order.subtotal,
-            discount: _order.discount,
-            tax: _order.tax,
-            shippingCharge: _order.shippingCharge,
-            pincodeDeliveryCharge: _order.pincodeDeliveryCharge,
-            totalAmount: _order.totalAmount,
-            paymentMethod: _order.paymentMethod,
-            paymentStatus: _order.paymentStatus,
-            razorpayOrderId: _order.razorpayOrderId,
-            razorpayPaymentId: _order.razorpayPaymentId,
-            shippingAddress: _order.shippingAddress,
-            billingAddress: _order.billingAddress,
-            notes: _order.notes,
+            subtotal: _o.subtotal,
+            discount: _o.discount,
+            tax: _o.tax,
+            shippingCharge: _o.shippingCharge,
+            pincodeDeliveryCharge: _o.pincodeDeliveryCharge,
+            totalAmount: _o.totalAmount,
+            paymentMethod: _o.paymentMethod,
+            paymentStatus: _o.paymentStatus,
+            razorpayOrderId: _o.razorpayOrderId,
+            razorpayPaymentId: _o.razorpayPaymentId,
+            shippingAddress: _o.shippingAddress,
+            billingAddress: _o.billingAddress,
+            notes: _o.notes,
             cancellationReason: reason,
             cancelledAt: DateTime.now(),
-            shipment: _order.shipment,
-            items: _order.items,
-            walletAmountUsed: _order.walletAmountUsed,
-            createdAt: _order.createdAt,
-            deliveredAt: _order.deliveredAt,
+            shipment: _o.shipment,
+            items: _o.items,
+            walletAmountUsed: _o.walletAmountUsed,
+            createdAt: _o.createdAt,
+            deliveredAt: _o.deliveredAt,
           );
         });
       }
@@ -253,7 +274,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   void _reorder() {
     final cart = context.read<CartProvider>();
-    for (final item in _order.items) {
+    for (final item in _o.items) {
       if (item.productId == null) continue;
       cart.addItem(Product(
         id: item.productId!,
@@ -265,7 +286,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${_order.items.length} item(s) added to cart'),
+        content: Text('${_o.items.length} item(s) added to cart'),
         backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
@@ -274,8 +295,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    if (_order == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Order Details')),
+        body: Center(
+          child: _loadingDetail
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    const Text('This order could not be found.'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Go Back'),
+                    ),
+                  ],
+                ),
+        ),
+      );
+    }
+
+    final order = _o;
     return Scaffold(
-      appBar: AppBar(title: Text('Order ${_order.orderNumber}')),
+      appBar: AppBar(title: Text('Order ${order.orderNumber}')),
       body: _loadingDetail
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -291,11 +337,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(height: 16),
                   _buildPriceSection(cs),
                   const SizedBox(height: 16),
-                  if (_order.paymentMethod != null) _buildPaymentSection(cs),
+                  if (order.paymentMethod != null) _buildPaymentSection(cs),
                   const SizedBox(height: 16),
-                  if (_order.shipment != null) _buildShipmentSection(cs),
+                  if (order.shipment != null) _buildShipmentSection(cs),
                   const SizedBox(height: 16),
-                  if (_order.shippingAddress != null) _buildAddressSection(),
+                  if (order.shippingAddress != null) _buildAddressSection(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -305,11 +351,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildStatusTimeline(ColorScheme cs) {
     final steps = ['pending', 'confirmed', 'shipped', 'delivered'];
-    final currentIdx = steps.indexOf(_order.status);
-    final displayIdx = currentIdx >= 0 ? currentIdx : (_order.status == 'processing' ? 1 : 0);
-    final isCancelled = _order.status == 'cancelled';
-    final isRefunded = _order.status == 'refunded';
-    final isReturned = _order.status == 'returned';
+    final currentIdx = steps.indexOf(_o.status);
+    final displayIdx = currentIdx >= 0 ? currentIdx : (_o.status == 'processing' ? 1 : 0);
+    final isCancelled = _o.status == 'cancelled';
+    final isRefunded = _o.status == 'refunded';
+    final isReturned = _o.status == 'returned';
 
     if (isCancelled || isRefunded || isReturned) {
       final (icon, color, title) = isCancelled
@@ -327,14 +373,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Icon(icon, size: 48, color: color),
               const SizedBox(height: 8),
               Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-              if (_order.cancellationReason != null && isCancelled) ...[
+              if (_o.cancellationReason != null && isCancelled) ...[
                 const SizedBox(height: 6),
-                Text('Reason: ${_order.cancellationReason}',
+                Text('Reason: ${_o.cancellationReason}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.grey, fontSize: 13)),
               ],
-              if (_order.createdAt != null)
-                Text('Placed on ${_order.createdAt!.day}/${_order.createdAt!.month}/${_order.createdAt!.year}',
+              if (_o.createdAt != null)
+                Text('Placed on ${_o.createdAt!.day}/${_o.createdAt!.month}/${_o.createdAt!.year}',
                     style: const TextStyle(color: Colors.grey, fontSize: 13)),
             ],
           ),
@@ -393,10 +439,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 );
               }),
             ),
-            if (_order.createdAt != null) ...[
+            if (_o.createdAt != null) ...[
               const SizedBox(height: 10),
               Center(
-                child: Text('Placed on ${_order.createdAt!.day}/${_order.createdAt!.month}/${_order.createdAt!.year}',
+                child: Text('Placed on ${_o.createdAt!.day}/${_o.createdAt!.month}/${_o.createdAt!.year}',
                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ),
             ],
@@ -424,7 +470,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       );
     }
-    if (_order.items.any((i) => i.productId != null)) {
+    if (_o.items.any((i) => i.productId != null)) {
       if (buttons.isNotEmpty) buttons.add(const SizedBox(width: 10));
       buttons.add(
         Expanded(
@@ -451,7 +497,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       children: [
         const Text('Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        ..._order.items.map((item) {
+        ..._o.items.map((item) {
           final imageUrl = item.image != null ? '${ApiConfig.imageBaseUrl}${item.image}' : null;
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -508,19 +554,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _priceRow('Subtotal', 'Rs. ${_order.subtotal.toStringAsFixed(0)}'),
-                if (_order.tax > 0)
-                  _priceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${_order.tax.toStringAsFixed(0)}'),
-                if (_order.shippingCharge > 0)
-                  _priceRow('Shipping', 'Rs. ${_order.shippingCharge.toStringAsFixed(0)}'),
-                if (_order.pincodeDeliveryCharge > 0)
-                  _priceRow('Delivery Charge', 'Rs. ${_order.pincodeDeliveryCharge.toStringAsFixed(0)}'),
-                if (_order.discount > 0)
-                  _priceRow('Discount', '- Rs. ${_order.discount.toStringAsFixed(0)}'),
-                if ((_order.walletAmountUsed ?? 0) > 0)
-                  _priceRow('Paid via Wallet', '- Rs. ${_order.walletAmountUsed!.toStringAsFixed(0)}', color: Colors.green),
+                _priceRow('Subtotal', 'Rs. ${_o.subtotal.toStringAsFixed(0)}'),
+                if (_o.tax > 0)
+                  _priceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${_o.tax.toStringAsFixed(0)}'),
+                if (_o.shippingCharge > 0)
+                  _priceRow('Shipping', 'Rs. ${_o.shippingCharge.toStringAsFixed(0)}'),
+                if (_o.pincodeDeliveryCharge > 0)
+                  _priceRow('Delivery Charge', 'Rs. ${_o.pincodeDeliveryCharge.toStringAsFixed(0)}'),
+                if (_o.discount > 0)
+                  _priceRow('Discount', '- Rs. ${_o.discount.toStringAsFixed(0)}'),
+                if ((_o.walletAmountUsed ?? 0) > 0)
+                  _priceRow('Paid via Wallet', '- Rs. ${_o.walletAmountUsed!.toStringAsFixed(0)}', color: Colors.green),
                 const Divider(),
-                _priceRow('Total', 'Rs. ${_order.totalAmount.toStringAsFixed(0)}', isBold: true),
+                _priceRow('Total', 'Rs. ${_o.totalAmount.toStringAsFixed(0)}', isBold: true),
               ],
             ),
           ),
@@ -544,18 +590,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
-                    _order.paymentMethod == 'cod' ? Icons.money : Icons.payment,
+                    _o.paymentMethod == 'cod' ? Icons.money : Icons.payment,
                     color: cs.primary,
                   ),
-                  title: Text(_order.paymentMethod == 'cod'
+                  title: Text(_o.paymentMethod == 'cod'
                       ? 'Cash on Delivery'
-                      : _order.paymentMethod == 'wallet'
+                      : _o.paymentMethod == 'wallet'
                           ? 'Wallet Payment'
                           : 'Razorpay'),
-                  subtitle: Text(_order.paymentStatus ?? 'Pending'),
-                  trailing: _buildPaymentStatusBadge(_order.paymentStatus),
+                  subtitle: Text(_o.paymentStatus ?? 'Pending'),
+                  trailing: _buildPaymentStatusBadge(_o.paymentStatus),
                 ),
-                if (_order.razorpayPaymentId != null && _order.razorpayPaymentId!.isNotEmpty) ...[
+                if (_o.razorpayPaymentId != null && _o.razorpayPaymentId!.isNotEmpty) ...[
                   const Divider(height: 1),
                   const SizedBox(height: 8),
                   Row(
@@ -563,21 +609,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     children: [
                       const Text('Payment ID', style: TextStyle(color: Colors.grey, fontSize: 13)),
                       Flexible(
-                        child: Text(_order.razorpayPaymentId!,
+                        child: Text(_o.razorpayPaymentId!,
                             style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                             overflow: TextOverflow.ellipsis),
                       ),
                     ],
                   ),
                 ],
-                if (_order.razorpayOrderId != null && _order.razorpayOrderId!.isNotEmpty) ...[
+                if (_o.razorpayOrderId != null && _o.razorpayOrderId!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Order Ref', style: TextStyle(color: Colors.grey, fontSize: 13)),
                       Flexible(
-                        child: Text(_order.razorpayOrderId!,
+                        child: Text(_o.razorpayOrderId!,
                             style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                             overflow: TextOverflow.ellipsis),
                       ),
@@ -593,7 +639,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildShipmentSection(ColorScheme cs) {
-    final s = _order.shipment!;
+    final s = _o.shipment!;
     final trackingUrl = s['tracking_url'] as String?;
     final courierResponse = s['courier_response'];
     final timeline = courierResponse is Map && courierResponse['timeline'] is List
@@ -725,7 +771,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildAddressSection() {
-    final a = _order.shippingAddress!;
+    final a = _o.shippingAddress!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
+import '../providers/notification_provider.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
 import '../models/home_section.dart';
@@ -31,6 +32,7 @@ import 'wishlist_screen.dart';
 import 'subscription_screen.dart';
 import 'wallet_screen.dart';
 import 'my_bookings_screen.dart';
+import 'notifications_screen.dart';
 import '../widgets/pro_member_badge.dart';
 import '../widgets/section_header.dart';
 import '../widgets/app_card.dart';
@@ -67,6 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
         pp.fetchBrands();
       }
       _fetchSectionProducts(pp);
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn) {
+        context.read<NotificationProvider>().loadUnreadCount();
+      }
     });
   }
 
@@ -308,6 +314,55 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.white,
               size: 28,
             ),
+          ),
+          Consumer<NotificationProvider>(
+            builder: (context, notificationProvider, _) {
+              final unread = notificationProvider.unreadCount;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    tooltip: 'Notifications',
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/notifications').then((_) {
+                        notificationProvider.loadUnreadCount();
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 2,
+                      top: 0,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           Stack(
             clipBehavior: Clip.none,
@@ -3639,6 +3694,17 @@ class _ProfileTab extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const WalletScreen()),
+                  ),
+                ),
+                const Divider(indent: 52),
+                ListTile(
+                  leading: Icon(Icons.notifications_none, color: primary),
+                  title: const Text('Notifications'),
+                  subtitle: const Text('Order updates & offers'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
                   ),
                 ),
                 const Divider(indent: 52),

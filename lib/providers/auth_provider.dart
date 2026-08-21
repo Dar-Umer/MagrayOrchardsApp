@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/push_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
@@ -22,8 +23,26 @@ class AuthProvider extends ChangeNotifier {
   String? get otpPhone => _otpPhone;
   String? get otpMaskedPhone => _otpMaskedPhone;
 
+  bool _isHandlingUnauthorized = false;
+
   AuthProvider() {
+    ApiService.setOnUnauthorized(_handleUnauthorized);
     loadToken();
+  }
+
+  /// Clears the local session when the API reports an expired/invalid token.
+  /// Does not call the logout endpoint (that would 401 again and recurse).
+  Future<void> _handleUnauthorized() async {
+    if (_isHandlingUnauthorized) return;
+    _isHandlingUnauthorized = true;
+    try {
+      _user = null;
+      _token = null;
+      await ApiService.setToken(null);
+      notifyListeners();
+    } finally {
+      _isHandlingUnauthorized = false;
+    }
   }
 
   Future<void> loadToken() async {
@@ -95,6 +114,7 @@ class AuthProvider extends ChangeNotifier {
       _user = User.fromJson(response['user'] ?? response['data']['user']);
       await ApiService.setToken(_token);
       await loadProfile();
+      _registerPushToken();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -117,6 +137,7 @@ class AuthProvider extends ChangeNotifier {
       _user = User.fromJson(response['data']['user']);
       await ApiService.setToken(_token);
       await loadProfile();
+      _registerPushToken();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -142,6 +163,7 @@ class AuthProvider extends ChangeNotifier {
       _user = User.fromJson(response['data']['user']);
       await ApiService.setToken(_token);
       await loadProfile();
+      _registerPushToken();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -202,6 +224,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
+      await PushService.instance.unregisterToken();
       if (_token != null) {
         await ApiService.post('/logout');
       }
@@ -216,7 +239,15 @@ class AuthProvider extends ChangeNotifier {
     final response = await ApiService.get('/profile');
     final data = response['data'] ?? response;
     _user = User.fromJson(data['user'] ?? data);
+    _registerPushToken();
     notifyListeners();
+  }
+
+  /// Registers the FCM token (and watcher) for the logged-in user, then
+  /// refreshes the inbox unread badge.
+  Future<void> _registerPushToken() async {
+    await PushService.instance.registerToken(this);
+    PushService.instance.watchTokenRefresh(this);
   }
 
   Future<bool> updateProfile({String? name, String? phone}) async {

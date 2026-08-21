@@ -324,6 +324,51 @@ class ApiService {
     return Map<String, dynamic>.from(response['data'] ?? response);
   }
 
+  // ─── Push notifications ────────────────────────────────────────────────
+
+  /// Register (or refresh) the FCM device token. Auth required.
+  static Future<void> registerDeviceToken(String token, {String deviceType = 'android'}) async {
+    await post('/notifications/device-token', body: {
+      'token': token,
+      'device_type': deviceType,
+    });
+  }
+
+  /// Unregister the FCM device token (e.g. on logout). Auth required.
+  static Future<void> unregisterDeviceToken(String token) async {
+    await delete('/notifications/device-token?token=${Uri.encodeComponent(token)}');
+  }
+
+  /// The user's notification inbox. Auth required.
+  static Future<List<dynamic>> fetchNotifications({int page = 1, int perPage = 15}) async {
+    final response = await get('/notifications', queryParams: {
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    });
+    final body = response is Map ? response['data'] : response;
+    final items = body is Map && body['data'] is List ? body['data'] : <dynamic>[];
+    return items;
+  }
+
+  /// Unread notification count. Auth required.
+  static Future<int> fetchUnreadCount() async {
+    final response = await get('/notifications/unread-count');
+    final data = response is Map && response['data'] is Map
+        ? (response['data'] as Map)['unread_count']
+        : null;
+    return (data is num) ? data.toInt() : 0;
+  }
+
+  /// Mark a single notification as read. Auth required.
+  static Future<void> markNotificationRead(int id) async {
+    await post('/notifications/$id/read');
+  }
+
+  /// Mark all notifications as read. Auth required.
+  static Future<void> markAllNotificationsRead() async {
+    await post('/notifications/read-all');
+  }
+
   static String _dateStr(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
