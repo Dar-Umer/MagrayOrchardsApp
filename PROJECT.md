@@ -1021,6 +1021,7 @@ flutter run -d chrome --web-port=5555
 | 67 | **Currency IEEE 754 float precision** — `intval($amount * 100)` replaced with `(int) round($amount * 100)` across `PaymentController`, `WalletService`, and `RazorpayService` to prevent 1-paisa rounding errors. |
 | 68 | **Restored Laravel automated test suite** — `TestCase.php`, `Unit/ExampleTest.php`, `Feature/PhoneAuthTest.php`, `Feature/WalletServiceTest.php`, `Feature/SubscriptionTest.php`, and `Feature/ShippingCalculatorTest.php` added. 13 tests, 39 assertions passing. |
 | 69 | **Added Flutter test suite** — `test/models_test.dart` added covering `User`, `ProductVariant`, and `HomeSection` JSON serialization and safe decimal-to-double conversions. |
+| 70 | **Storefront front-page UI/UX enhancements (ui-ux-pro-max)** — upgraded `welcome.blade.php` and `layouts/shop.blade.php`: added 4-pillar trust strip (Free Delivery ₹999+, 100% Genuine, Agronomist Advisory, COD/UPI), quick search chips in hero, dual-action product cards ("Cart" + "Buy Now"), trusted brand showcase, polished service cards with "Book Visit" CTA, and floating agronomist support FAB with one-tap WhatsApp and phone dialing. |
 
 ---
 
