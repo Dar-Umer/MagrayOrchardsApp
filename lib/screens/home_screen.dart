@@ -59,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshShopConfig();
       final pp = context.read<ProductProvider>();
       if (pp.products.isEmpty) {
         pp.fetchProducts(isFeatured: true, page: 1);
@@ -74,6 +75,13 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<NotificationProvider>().loadUnreadCount();
       }
     });
+  }
+
+  /// Re-fetch the remote shop config (home layout, maintenance, versions) so
+  /// admin changes appear without a full app restart. Rebuilds the sections.
+  Future<void> _refreshShopConfig() async {
+    await ShopConfig.load();
+    if (mounted) setState(() {});
   }
 
   /// Trigger fetches for any admin-configured category/brand product sections.
@@ -183,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         color: scheme.primary,
         onRefresh: () async {
+          await _refreshShopConfig();
           final pp = context.read<ProductProvider>();
           await Future.wait([
             pp.fetchProducts(isFeatured: true, page: 1),
@@ -194,26 +203,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ]);
           _fetchSectionProducts(pp);
         },
-        child: CustomScrollView(
-          slivers: [
-            if (_isSectionEnabled('announcement'))
-              SliverToBoxAdapter(child: _buildAnnouncementBar(context)),
-            SliverToBoxAdapter(
-              child: _buildReferenceHeader(context, cartCount),
-            ),
-            SliverToBoxAdapter(child: _buildSearchBar(context)),
-            if (_searchQuery.isNotEmpty)
-              _buildSearchResults(context)
-            else ...[
-              ..._buildHomeSections(context),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ],
+        child: ValueListenableBuilder<int>(
+          valueListenable: ShopConfig.revision,
+          builder: (context, _, _) {
+            return CustomScrollView(
+              slivers: [
+                if (_isSectionEnabled('announcement'))
+                  SliverToBoxAdapter(child: _buildAnnouncementBar(context)),
+                SliverToBoxAdapter(
+                  child: _buildReferenceHeader(context, cartCount),
+                ),
+                SliverToBoxAdapter(child: _buildSearchBar(context)),
+                if (_searchQuery.isNotEmpty)
+                  _buildSearchResults(context)
+                else ...[
+                  ..._buildHomeSections(context),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                ],
+              ],
+            );
+          },
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        onDestinationSelected: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 0) _refreshShopConfig();
+        },
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
@@ -1189,7 +1206,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPromoStrip(BuildContext context) {
-    if (!ShopConfig.promoBannerEnabled) return const SizedBox.shrink();
     final color = ShopConfig.promoBannerColor;
     return GestureDetector(
       onTap: () => _openPromoLink(context),

@@ -35,7 +35,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _shippingLoading = false;
   int? _estimatedDays;
   double _walletBalance = 0;
-  bool _walletLoading = false;
 
   static double _toDouble(dynamic value) {
     if (value == null) return 0.0;
@@ -384,14 +383,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final tax = _getTax(subtotal);
     final shipping = _getShipping(addressProvider);
     return subtotal + tax + shipping - _couponDiscount;
-  }
-
-  String _rzpVal(dynamic r, String key) {
-    if (r is Map) return r['razorpay_${key}_id'] ?? r[key] ?? '';
-    if (key == 'order_id') return r.orderId ?? '';
-    if (key == 'payment_id') return r.paymentId ?? '';
-    if (key == 'signature') return r.signature ?? '';
-    return r[key] ?? '';
   }
 
   void _handlePaymentSuccess(dynamic response) async {

@@ -235,7 +235,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                           ),
                           onPressed: () async {
                             final wasInWishlist = provider.isInWishlist(product.id);
-                            final result = await provider.toggleWishlist(product.id);
+                            await provider.toggleWishlist(product.id);
                             if (mounted) {
                               if (provider.errorMessage != null) {
                                 ScaffoldMessenger.of(context).showSnackBar(

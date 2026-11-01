@@ -88,7 +88,7 @@ class _PaidContentDetailScreenState extends State<PaidContentDetailScreen> {
                         Text(_content!.summary!,
                             style: TextStyle(fontSize: 15, color: Colors.grey.shade700)),
                       const SizedBox(height: 16),
-                      Text(_content!.body ?? '', style: const TextStyle(fontSize: 15, height: 1.6)),
+                      Text(_content!.body, style: const TextStyle(fontSize: 15, height: 1.6)),
                     ],
                   ),
                 ),

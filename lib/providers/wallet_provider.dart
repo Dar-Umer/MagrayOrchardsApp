@@ -81,7 +81,7 @@ class WalletProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      final response = await ApiService.post('/wallet/topup', body: {'amount': amount});
+      await ApiService.post('/wallet/topup', body: {'amount': amount});
       _isLoading = false;
       notifyListeners();
       return true;

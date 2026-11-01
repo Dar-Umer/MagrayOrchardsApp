@@ -81,14 +81,6 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     }
   }
 
-  String _rzpVal(dynamic r, String key) {
-    if (r is Map) return r['razorpay_${key}_id'] ?? r[key] ?? '';
-    if (key == 'order_id') return r.orderId ?? '';
-    if (key == 'payment_id') return r.paymentId ?? '';
-    if (key == 'signature') return r.signature ?? '';
-    return r[key] ?? '';
-  }
-
   void _handlePaymentSuccess(dynamic response) async {
     setState(() => _isLoading = true);
     // IdentityMap uses identical() — convert to regular map for safe key lookup

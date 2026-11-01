@@ -5,6 +5,11 @@ import '../models/home_section.dart';
 import 'api_service.dart';
 
 class ShopConfig {
+  /// Bumped every time [load] succeeds, so UI can react to remote config
+  /// changes (admin toggles) without a full app restart. The home screen
+  /// listens to this to rebuild its sections.
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   static double _taxRate = 18;
   static bool _gstEnabled = true;
   static String _gstin = '';
@@ -45,12 +50,11 @@ class ShopConfig {
   static List<HomeSection> _homeSections = const [];
 
   static const List<HomeSection> _defaultHomeSections = [
-    HomeSection(type: 'announcement'),
-    HomeSection(type: 'delivery'),
+    HomeSection(type: 'delivery', enabled: false),
     HomeSection(type: 'banner_carousel'),
     HomeSection(type: 'categories'),
     HomeSection(type: 'brands'),
-    HomeSection(type: 'promo'),
+    HomeSection(type: 'promo', enabled: false),
     HomeSection(
         type: 'products',
         title: "Today's Offers",
@@ -179,7 +183,11 @@ class ShopConfig {
 
       final layout = HomeLayout.fromJson(data['home_layout']);
       _homeSections = layout.sections;
-    } catch (_) {
+
+      // Notify listeners (home screen, checkout, etc.) that config changed.
+      revision.value++;
+    } catch (e) {
+      debugPrint('ShopConfig.load failed: $e');
     }
   }
 

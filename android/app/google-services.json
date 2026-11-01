@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "274078590696",
+    "project_id": "magray-orchards",
+    "storage_bucket": "magray-orchards.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:274078590696:android:3cd60b54c3133f40c88b5d",
+        "android_client_info": {
+          "package_name": "com.magray.orchards"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNZ0tV4Qm2rcxRzD4-7qbYi29Ev_Qda0Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
