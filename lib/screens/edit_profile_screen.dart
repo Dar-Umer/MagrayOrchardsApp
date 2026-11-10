@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../utils/formatters.dart';
+import 'change_password_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -113,8 +115,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Form(
+                key: _formKey,
             child: Column(
               children: [
                 // Dashboard Stats
@@ -128,7 +133,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     children: [
                       Expanded(child: _buildStatCard('Orders', _totalOrders?.toString() ?? '0', Icons.shopping_bag_outlined, cs)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildStatCard('Spent', 'Rs.${(_totalSpent ?? 0).toStringAsFixed(0)}', Icons.account_balance_wallet_outlined, cs)),
+                      Expanded(child: _buildStatCard('Spent', formatCurrency(_totalSpent ?? 0), Icons.account_balance_wallet_outlined, cs)),
                       const SizedBox(width: 8),
                       Expanded(child: _buildStatCard('Addresses', _savedAddresses?.toString() ?? '0', Icons.location_on_outlined, cs)),
                     ],
@@ -226,11 +231,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                   ),
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _isSaving
+                        ? null
+                        : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ChangePasswordScreen(),
+                              ),
+                            ),
+                    icon: Icon(Icons.lock_reset, color: cs.primary),
+                    label: Text(
+                      'Reset Password',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: cs.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: cs.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 

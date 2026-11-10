@@ -4,6 +4,7 @@ import '../providers/wallet_provider.dart';
 import '../services/razorpay_factory.dart';
 import '../services/razorpay_helper.dart';
 import '../services/api_service.dart';
+import '../utils/formatters.dart';
 
 class WalletTopUpScreen extends StatefulWidget {
   const WalletTopUpScreen({super.key});
@@ -44,7 +45,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     final amount = _getAmount();
     if (amount == null || amount < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount (min ₹1)'), backgroundColor: Colors.orange),
+        const SnackBar(content: Text('Please enter a valid amount (min Rs. 1)'), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -97,7 +98,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('₹${_topUpAmount.toStringAsFixed(0)} added to your wallet!'),
+              content: Text('${formatCurrency(_topUpAmount)} added to your wallet!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -149,90 +150,95 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Current Balance', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                    const SizedBox(height: 4),
-                    Text(
-                      '₹${wallet.balance.toStringAsFixed(2)}',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: cs.primary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text('Select Amount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.primary)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _presetAmounts.map((amount) {
-                final isSelected = _amountController.text == amount.toStringAsFixed(0);
-                return GestureDetector(
-                  onTap: () => setState(() => _amountController.text = amount.toStringAsFixed(0)),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? cs.primary : cs.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? cs.primary : Colors.grey.shade300,
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      '₹${amount.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : null,
-                      ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Current Balance', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                        const SizedBox(height: 4),
+                        Text(
+                          formatCurrency(wallet.balance, alwaysShowDecimals: true),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: cs.primary),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Custom Amount',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _initiateTopUp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cs.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : const Text(
-                        'Proceed to Pay',
-                        style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                const SizedBox(height: 24),
+                Text('Select Amount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.primary)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _presetAmounts.map((amount) {
+                    final isSelected = _amountController.text == amount.toStringAsFixed(0);
+                    return GestureDetector(
+                      onTap: () => setState(() => _amountController.text = amount.toStringAsFixed(0)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? cs.primary : cs.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? cs.primary : Colors.grey.shade300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Text(
+                          formatCurrency(amount),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : null,
+                          ),
+                        ),
                       ),
-              ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Custom Amount',
+                    prefixText: 'Rs. ',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _initiateTopUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          )
+                        : const Text(
+                            'Proceed to Pay',
+                            style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

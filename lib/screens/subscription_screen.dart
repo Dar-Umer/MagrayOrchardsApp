@@ -3,8 +3,19 @@ import 'package:provider/provider.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/paid_content.dart';
+import '../utils/formatters.dart';
 import 'paid_content_detail_screen.dart';
 import 'subscription_plans_screen.dart';
+
+/// Formats ISO-8601 API timestamps into a readable local date (`16 Sep 2026`).
+String formatSubscriptionDate(dynamic raw) => formatDate(raw);
+
+/// Formats numeric prices without redundant `.00` decimals.
+String formatSubscriptionPrice(dynamic raw) {
+  final value = raw is num ? raw.toDouble() : double.tryParse(raw?.toString() ?? '');
+  if (value == null) return '${raw ?? 0}';
+  return value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toStringAsFixed(2);
+}
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -30,7 +41,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Subscription'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Consumer<SubscriptionProvider>(
         builder: (context, provider, child) {
@@ -38,33 +48,43 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           final lastSub = provider.lastSubscription;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (currentSub != null) ...[
-                  _buildCurrentPlan(currentSub),
-                ] else ...[
-                  if (lastSub != null &&
-                      (lastSub['status'] == 'cancelled' || lastSub['status'] == 'expired'))
-                    _buildLastSubscriptionCard(lastSub),
-                  _buildNoPlan(),
-                ],
-                const SizedBox(height: 24),
-                const Text('Available Content', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                if (provider.isLoading)
-                  const Center(child: CircularProgressIndicator())
-                else if (provider.paidContents.isEmpty)
-                  Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: Text('No content available', style: TextStyle(color: Colors.grey))),
-                    ),
-                  )
-                else
-                  ...provider.paidContents.map((c) => _ContentCard(content: c)),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (currentSub != null) ...[
+                      _buildCurrentPlan(currentSub),
+                    ] else ...[
+                      if (lastSub != null &&
+                          (lastSub['status'] == 'cancelled' || lastSub['status'] == 'expired')) ...[
+                        _buildLastSubscriptionCard(lastSub),
+                        const SizedBox(height: 16),
+                      ],
+                      _buildNoPlan(),
+                    ],
+                    const SizedBox(height: 24),
+                    const Text('Available Content', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    if (provider.isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (provider.paidContents.isEmpty)
+                      SizedBox(
+                        width: double.infinity,
+                        child: Card(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(child: Text('No content available', style: TextStyle(color: Colors.grey))),
+                          ),
+                        ),
+                      )
+                    else
+                      ...provider.paidContents.map((c) => _ContentCard(content: c)),
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -94,11 +114,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             const SizedBox(height: 12),
             Text(plan?['name'] ?? 'Unknown', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text('₹${plan?['price'] ?? 0} / ${plan?['billing_period'] ?? ''}',
+            Text('${formatCurrency(plan?['price'] ?? 0)} / ${plan?['billing_period'] ?? ''}',
                 style: const TextStyle(fontSize: 14)),
             if (sub['end_date'] != null) ...[
               const SizedBox(height: 4),
-              Text('Valid till ${sub['end_date']}',
+              Text('Valid till ${formatSubscriptionDate(sub['end_date'])}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ],
             if (plan?['has_free_delivery'] == true || plan?['has_fast_support'] == true) ...[
@@ -252,13 +272,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             const SizedBox(height: 8),
             Text('${plan?['name'] ?? 'Previous plan'}',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
-            if (sub['end_date'] != null)
-              Text('Ended ${sub['end_date']}',
+            if (sub['end_date'] != null) ...[
+              const SizedBox(height: 4),
+              Text('Ended ${formatSubscriptionDate(sub['end_date'])}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            if (cancelledAt != null && cancelledAt.isNotEmpty)
-              Text('Cancelled on ${cancelledAt.split('T').first}'
+            ],
+            if (cancelledAt != null && cancelledAt.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text('Cancelled on ${formatSubscriptionDate(cancelledAt)}'
                   '${sub['cancelled_by'] == 'admin' ? ' (by admin)' : ''}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            ],
             if (reason != null && reason.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 6),

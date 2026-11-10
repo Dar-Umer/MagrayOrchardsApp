@@ -10,6 +10,8 @@ class ShopConfig {
   /// listens to this to rebuild its sections.
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
+  static String _siteName = 'Magray Orchards';
+  static String _logoUrl = '';
   static double _taxRate = 18;
   static bool _gstEnabled = true;
   static String _gstin = '';
@@ -80,6 +82,8 @@ class ShopConfig {
     HomeSection(type: 'services'),
   ];
 
+  static String get siteName => _siteName;
+  static String get logoUrl => _logoUrl;
   static double get taxRate => _taxRate;
   static bool get gstEnabled => _gstEnabled;
   static double get taxDecimal => _gstEnabled ? _taxRate / 100 : 0;
@@ -138,47 +142,80 @@ class ShopConfig {
     return !Platform.isIOS;
   }
 
+  static String _str(dynamic v, [String fallback = '']) =>
+      v == null ? fallback : v.toString();
+
+  static String _strNonEmpty(dynamic v, String fallback) {
+    final s = v?.toString().trim() ?? '';
+    return s.isNotEmpty ? s : fallback;
+  }
+
+  static double _double(dynamic v, double fallback) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? fallback;
+  }
+
+  static bool _bool(dynamic v, bool fallback) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      if (v.toLowerCase() == 'true' || v == '1') return true;
+      if (v.toLowerCase() == 'false' || v == '0') return false;
+    }
+    return fallback;
+  }
+
   static Future<void> load() async {
     try {
       final response = await ApiService.get('/config');
       final data = response['data'] ?? response;
-      _taxRate = (data['tax_rate'] as num?)?.toDouble() ?? 18;
-      _gstEnabled = (data['gst_enabled'] as bool?) ?? true;
-      _gstin = (data['gstin'] as String?) ?? '';
-      _maxOrderAmount = (data['max_order_amount'] as num?)?.toDouble() ?? 0;
-      _announcementMessage = (data['announcement_message'] as String?) ?? _announcementMessage;
-      _announcementMessageShort = (data['announcement_message_short'] as String?) ?? _announcementMessageShort;
-      _freeDeliveryThreshold = (data['free_delivery_threshold'] as num?)?.toDouble() ?? 999;
-      _otpVerificationEnabled = (data['otp_verification_enabled'] as bool?) ?? true;
-      _promoBannerEnabled = (data['promo_banner_enabled'] as bool?) ?? true;
-      _promoBannerTitle = (data['promo_banner_title'] as String?) ?? _promoBannerTitle;
-      _promoBannerSubtitle = (data['promo_banner_subtitle'] as String?) ?? _promoBannerSubtitle;
-      final colorHex = (data['promo_banner_color'] as String?) ?? '';
+      if (data is! Map) return;
+
+      _siteName = _strNonEmpty(data['site_name'], _siteName);
+      _logoUrl = _str(data['logo_url']);
+      _taxRate = _double(data['tax_rate'], 18);
+      _gstEnabled = _bool(data['gst_enabled'], true);
+      _gstin = _str(data['gstin']);
+      _maxOrderAmount = _double(data['max_order_amount'], 0);
+      _announcementMessage = _str(data['announcement_message'], _announcementMessage);
+      _announcementMessageShort =
+          _str(data['announcement_message_short'], _announcementMessageShort);
+      _freeDeliveryThreshold = _double(data['free_delivery_threshold'], 999);
+      _otpVerificationEnabled = _bool(data['otp_verification_enabled'], true);
+      _promoBannerEnabled = _bool(data['promo_banner_enabled'], true);
+      _promoBannerTitle = _str(data['promo_banner_title'], _promoBannerTitle);
+      _promoBannerSubtitle = _str(data['promo_banner_subtitle'], _promoBannerSubtitle);
+      final colorHex = _str(data['promo_banner_color']);
       if (colorHex.isNotEmpty) {
         final parsed = _parseHexColor(colorHex);
         if (parsed != null) _promoBannerColor = parsed;
       }
-      _promoBannerLink = (data['promo_banner_link'] as String?) ?? '';
+      _promoBannerLink = _str(data['promo_banner_link']);
 
-      _androidLatestVersion = (data['mobile_app_android_latest_version'] as String?) ?? _androidLatestVersion;
-      _androidMinVersion = (data['mobile_app_android_min_version'] as String?) ?? _androidMinVersion;
-      _androidStoreUrl = (data['mobile_app_android_store_url'] as String?) ?? '';
-      _iosLatestVersion = (data['mobile_app_ios_latest_version'] as String?) ?? _iosLatestVersion;
-      _iosMinVersion = (data['mobile_app_ios_min_version'] as String?) ?? _iosMinVersion;
-      _iosStoreUrl = (data['mobile_app_ios_store_url'] as String?) ?? '';
-      _updateNotes = (data['mobile_app_update_notes'] as String?) ?? '';
-      _maintenanceEnabled = (data['mobile_app_maintenance_enabled'] as bool?) ?? false;
-      _maintenanceMessage = (data['mobile_app_maintenance_message'] as String?) ?? _maintenanceMessage;
-      _maintenanceUntil = (data['mobile_app_maintenance_until'] as String?) ?? '';
+      _androidLatestVersion = _strNonEmpty(
+          data['mobile_app_android_latest_version'], _androidLatestVersion);
+      _androidMinVersion = _strNonEmpty(
+          data['mobile_app_android_min_version'], _androidMinVersion);
+      _androidStoreUrl = _str(data['mobile_app_android_store_url']);
+      _iosLatestVersion = _strNonEmpty(
+          data['mobile_app_ios_latest_version'], _iosLatestVersion);
+      _iosMinVersion =
+          _strNonEmpty(data['mobile_app_ios_min_version'], _iosMinVersion);
+      _iosStoreUrl = _str(data['mobile_app_ios_store_url']);
+      _updateNotes = _str(data['mobile_app_update_notes']);
+      _maintenanceEnabled = _bool(data['mobile_app_maintenance_enabled'], false);
+      _maintenanceMessage = _strNonEmpty(
+          data['mobile_app_maintenance_message'], _maintenanceMessage);
+      _maintenanceUntil = _str(data['mobile_app_maintenance_until']);
 
       final firebase = data['firebase'];
       if (firebase is Map) {
-        _firebaseApiKey = (firebase['api_key'] as String?) ?? '';
-        _firebaseAppId = (firebase['app_id'] as String?) ?? '';
-        _firebaseMessagingSenderId = (firebase['messaging_sender_id'] as String?) ?? '';
-        _firebaseProjectId = (firebase['project_id'] as String?) ?? '';
-        _firebaseAuthDomain = (firebase['auth_domain'] as String?) ?? '';
-        _firebaseStorageBucket = (firebase['storage_bucket'] as String?) ?? '';
+        _firebaseApiKey = _str(firebase['api_key']);
+        _firebaseAppId = _str(firebase['app_id']);
+        _firebaseMessagingSenderId = _str(firebase['messaging_sender_id']);
+        _firebaseProjectId = _str(firebase['project_id']);
+        _firebaseAuthDomain = _str(firebase['auth_domain']);
+        _firebaseStorageBucket = _str(firebase['storage_bucket']);
       }
 
       final layout = HomeLayout.fromJson(data['home_layout']);

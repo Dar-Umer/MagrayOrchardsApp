@@ -28,12 +28,14 @@ class ThemeProvider extends ChangeNotifier {
     _fetchFromServer();
   }
 
+  Future<void> refresh() => _fetchFromServer();
+
   Future<void> _fetchFromServer() async {
     try {
       final response = await ApiService.get('/settings/theme');
       final data = response['data'] ?? response;
-      final palette = data['theme_palette'] as String?;
-      final font = data['font_family'] as String?;
+      final palette = data['theme_palette']?.toString();
+      final font = data['font_family']?.toString();
 
       bool changed = false;
       if (palette != null && ThemeConfig.palettes.containsKey(palette) && palette != _paletteName) {

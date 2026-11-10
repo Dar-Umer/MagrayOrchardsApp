@@ -88,19 +88,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!auth.isLoggedIn) {
       return Scaffold(
         appBar: AppBar(title: const Text('Notifications')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('Login to see your notifications'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('Login'),
-              ),
-            ],
-          ),
+        body: EmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: 'Login to see your notifications',
+          message: 'Sign in to view order updates and offers',
+          actionLabel: 'Login',
+          actionIcon: Icons.login,
+          onAction: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const LoginScreen())),
         ),
       );
     }
@@ -112,6 +107,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (provider.unreadCount > 0)
             TextButton(
               onPressed: () => provider.markAllRead(),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               child: const Text('Mark all read'),
             ),
         ],
@@ -130,31 +126,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 ],
               )
-            : ListView.separated(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                itemCount: provider.notifications.length + (provider.isLoading ? 1 : 0),
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  if (index >= provider.notifications.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  }
-                  final n = provider.notifications[index];
-                  return _NotificationTile(
-                    notification: n,
-                    onTap: () => _openNotification(n),
-                  );
-                },
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: ListView.separated(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: provider.notifications.length + (provider.isLoading ? 1 : 0),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      if (index >= provider.notifications.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+                      final n = provider.notifications[index];
+                      return _NotificationTile(
+                        notification: n,
+                        onTap: () => _openNotification(n),
+                      );
+                    },
+                  ),
+                ),
               ),
       ),
     );

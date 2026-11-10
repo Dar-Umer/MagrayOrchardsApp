@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:magray_orchards/models/user.dart';
+import 'package:magray_orchards/models/product.dart';
 import 'package:magray_orchards/models/product_variant.dart';
 import 'package:magray_orchards/models/home_section.dart';
+import 'package:magray_orchards/models/banner.dart';
+import 'package:magray_orchards/providers/cart_provider.dart';
 
 void main() {
   group('User Model Tests', () {
@@ -91,6 +95,78 @@ void main() {
       expect(section.source, 'featured');
       expect(section.layout, 'carousel');
       expect(section.enabled, true);
+      expect(section.itemsPerRow, 10);
+      expect(section.fetchLimit, 10);
+    });
+
+    test('HomeSection respects limit, grid fetchLimit, and string IDs', () {
+      final carousel = HomeSection.fromJson({
+        'type': 'products',
+        'source': 'category',
+        'layout': 'carousel',
+        'rows': '2',
+        'limit': '8',
+        'category_id': '4',
+      });
+      expect(carousel.rowCount, 2);
+      expect(carousel.itemsPerRow, 8);
+      expect(carousel.fetchLimit, 16);
+      expect(carousel.categoryId, 4);
+
+      final grid = HomeSection.fromJson({
+        'type': 'products',
+        'layout': 'grid',
+        'rows': 3,
+        'limit': 10,
+      });
+      expect(grid.fetchLimit, 6);
+    });
+  });
+
+  group('AppBanner Model Tests', () {
+    test('AppBanner parses backend link field cleanly', () {
+      final banner = AppBanner.fromJson({
+        'id': 4,
+        'title': 'Monsoon Sale',
+        'image': 'banners/monsoon-sale.jpg',
+        'link': '/products?category=pesticides',
+        'sort_order': 1,
+      });
+
+      expect(banner.id, 4);
+      expect(banner.link, '/products?category=pesticides');
+      expect(banner.sortOrder, 1);
+    });
+  });
+
+  group('CartProvider Variant Tests', () {
+    test('CartProvider separates variants and serializes variant_id in toOrderItems', () async {
+      SharedPreferences.setMockInitialValues({});
+      final cart = CartProvider();
+      final product = Product(
+        id: 7,
+        name: 'Neem Oil',
+        slug: 'neem-oil',
+        price: 350,
+        stockQuantity: 10,
+      );
+      final liter = ProductVariant(
+        id: 21,
+        productId: 7,
+        name: '1 Liter',
+        price: 680,
+        stockQuantity: 5,
+      );
+
+      await cart.addItem(product, quantity: 1);
+      await cart.addItem(product, quantity: 2, variant: liter);
+
+      expect(cart.items.length, 2);
+      expect(cart.total, 350 + (680 * 2));
+      final orderItems = cart.toOrderItems();
+      expect(orderItems[0].containsKey('variant_id'), false);
+      expect(orderItems[1]['variant_id'], 21);
+      expect(orderItems[1]['quantity'], 2);
     });
   });
 }

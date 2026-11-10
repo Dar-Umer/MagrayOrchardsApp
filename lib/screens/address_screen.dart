@@ -100,25 +100,15 @@ class _AddressScreenState extends State<AddressScreen> {
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.lock_outline, size: 80, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text(
-                'Login to manage addresses',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-                child: const Text('Login', style: TextStyle(color: Colors.white)),
-              ),
-            ],
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Login to manage addresses',
+          message: 'Save delivery addresses for faster checkout',
+          actionLabel: 'Login',
+          actionIcon: Icons.login,
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
           ),
         ),
       );
@@ -146,9 +136,12 @@ class _AddressScreenState extends State<AddressScreen> {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: provider.addresses.length,
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: provider.addresses.length,
             itemBuilder: (context, index) {
               final address = provider.addresses[index];
               return Card(
@@ -260,6 +253,8 @@ class _AddressScreenState extends State<AddressScreen> {
                 ),
               );
             },
+          ),
+            ),
           );
         },
       ),

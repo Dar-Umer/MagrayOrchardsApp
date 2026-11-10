@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/skeleton_box.dart';
 import '../config/api_config.dart';
 import '../models/order.dart';
 import '../models/product.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
+import '../utils/app_navigation.dart';
+import '../utils/formatters.dart';
 import 'login_screen.dart';
 import 'order_detail_screen.dart';
 
@@ -104,23 +107,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (!auth.isLoggedIn) {
       return Scaffold(
         appBar: AppBar(title: const Text('My Orders')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.lock_outline, size: 80, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Login to view your orders',
-                  style: TextStyle(fontSize: 18, color: Colors.grey)),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-                child: const Text('Login', style: TextStyle(color: Colors.white)),
-              ),
-            ],
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Login to view your orders',
+          message: 'Sign in to track purchases and reorder items',
+          actionLabel: 'Login',
+          actionIcon: Icons.login,
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
           ),
         ),
       );
@@ -131,13 +126,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
       body: Consumer<OrderProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.orders.isEmpty) {
-            return Center(child: CircularProgressIndicator(color: cs.primary));
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: const ShimmerCardList(itemCount: 4, itemHeight: 136),
+              ),
+            );
           }
           if (provider.orders.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
               icon: Icons.shopping_bag_outlined,
               title: 'No orders yet',
               message: 'Start shopping to see your orders here',
+              actionLabel: 'Browse Products',
+              actionIcon: Icons.storefront_outlined,
+              onAction: () => AppNavigation.goToTab(context, 0),
             );
           }
 
@@ -145,33 +148,38 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           return RefreshIndicator(
             onRefresh: () => provider.fetchOrders(),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildFilterChips(provider, cs)),
-                SliverToBoxAdapter(child: _buildSearchBar(provider, cs)),
-                if (filtered.isEmpty && provider.orders.isNotEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: const EmptyState(
-                      icon: Icons.search_off,
-                      title: 'No orders match your filters',
-                      message: 'Try a different search or status',
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final order = filtered[index];
-                          return _buildOrderCard(order, cs, provider);
-                        },
-                        childCount: filtered.length,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildFilterChips(provider, cs)),
+                    SliverToBoxAdapter(child: _buildSearchBar(provider, cs)),
+                    if (filtered.isEmpty && provider.orders.isNotEmpty)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyState(
+                          icon: Icons.search_off,
+                          title: 'No orders match your filters',
+                          message: 'Try a different search or status',
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final order = filtered[index];
+                              return _buildOrderCard(order, cs, provider);
+                            },
+                            childCount: filtered.length,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-              ],
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -279,12 +287,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         Text('${order.items.length} item(s)',
                             style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                         const SizedBox(height: 2),
-                        Text('Rs. ${order.totalAmount.toStringAsFixed(0)}',
+                        Text(formatCurrency(order.totalAmount),
                             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: cs.primary)),
                         if (order.createdAt != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            '${order.createdAt!.day}/${order.createdAt!.month}/${order.createdAt!.year}',
+                            formatDate(order.createdAt),
                             style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                         ],

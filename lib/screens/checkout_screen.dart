@@ -4,17 +4,24 @@ import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/address_provider.dart';
 import '../providers/order_provider.dart';
+import '../config/api_config.dart';
 import '../services/api_service.dart';
 import '../services/razorpay_factory.dart';
 import '../services/razorpay_helper.dart';
 import '../services/shop_config.dart';
 import '../services/sound_service.dart';
 import '../providers/wallet_provider.dart';
+import '../utils/app_navigation.dart';
+import '../utils/formatters.dart';
+import '../widgets/app_network_image.dart';
+import '../widgets/empty_state.dart';
 import 'home_screen.dart';
 import 'address_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  final List<CartItem>? expressItems;
+
+  const CheckoutScreen({super.key, this.expressItems});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -33,8 +40,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double? _apiShipping;
   bool _freeDelivery = false;
   bool _shippingLoading = false;
+  bool? _serviceable;
+  String? _shippingMessage;
   int? _estimatedDays;
   double _walletBalance = 0;
+
+  bool get _isExpress =>
+      widget.expressItems != null && widget.expressItems!.isNotEmpty;
+
+  List<CartItem> _activeItems(CartProvider cart) =>
+      _isExpress ? widget.expressItems! : cart.items;
+
+  List<Map<String, dynamic>> _orderItemsPayload(CartProvider cart) =>
+      CartProvider.itemsToOrderPayload(_activeItems(cart));
 
   static double _toDouble(dynamic value) {
     if (value == null) return 0.0;
@@ -54,7 +72,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       addressProvider.fetchAddresses().then((_) {
         if (!mounted) return;
         final selected = addressProvider.selectedAddress;
-        if (selected != null) _fetchShippingForPincode(selected.pincode);
+        if (selected != null) {
+          setState(() => _selectedAddressId = selected.id);
+          _fetchShippingForPincode(selected.pincode);
+        }
       });
       final walletProvider = context.read<WalletProvider>();
       walletProvider.fetchBalance().then((_) {
@@ -71,7 +92,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double _getSubtotal(CartProvider cart) {
-    return cart.total;
+    return _activeItems(cart).fold(
+      0.0,
+      (sum, item) => sum + item.unitPrice * item.quantity,
+    );
   }
 
   double _getTax(double subtotal) {
@@ -107,18 +131,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _fetchShippingForPincode(String pincode) async {
     if (pincode.isEmpty) return;
-    setState(() => _shippingLoading = true);
+    setState(() {
+      _shippingLoading = true;
+      _serviceable = null;
+      _shippingMessage = null;
+    });
     try {
       final cart = context.read<CartProvider>();
       final response = await ApiService.post('/shipping-rate', body: {
         'pincode': pincode,
-        'items': cart.toOrderItems(),
+        'items': _orderItemsPayload(cart),
         'subtotal': _getSubtotal(cart),
       });
       final data = response['data'] ?? response;
       setState(() {
         _apiShipping = _toDouble(data['delivery_charge'] ?? 50);
         _freeDelivery = data['free_delivery'] == true;
+        _serviceable = data['serviceable'] as bool?;
+        _shippingMessage = data['message']?.toString();
         final days = data['estimated_days'];
         _estimatedDays = days is num ? days.toInt() : (days is String ? int.tryParse(days) : null);
       });
@@ -126,6 +156,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _apiShipping = null;
         _freeDelivery = false;
+        _serviceable = null;
+        _shippingMessage = null;
         _estimatedDays = null;
       });
     } finally {
@@ -200,7 +232,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       return;
     }
-    if (cart.items.isEmpty) {
+    if (_activeItems(cart).isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Your cart is empty'), backgroundColor: Colors.orange),
       );
@@ -212,7 +244,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (maxOrderAmount > 0 && total > maxOrderAmount) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('This order exceeds the maximum order amount of Rs. ${maxOrderAmount.toStringAsFixed(2)}. Please reduce the items in your cart.'),
+          content: Text('This order exceeds the maximum order amount of ${formatCurrency(maxOrderAmount, alwaysShowDecimals: true)}. Please reduce the items in your cart.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -232,7 +264,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e is ApiException ? e.message : 'We couldn\'t place your order. Please try again.'}'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e is ApiException ? e.message : 'We couldn\'t place your order. Please try again.'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -249,10 +281,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final order = await orderProvider.createOrder(
       addressId: addressProvider.selectedAddress!.id,
       paymentMethod: 'cod',
-      items: cart.toOrderItems(),
+      items: _orderItemsPayload(cart),
+      couponCode: _couponCode,
       notes: _couponCode != null ? 'Coupon: $_couponCode' : null,
     );
-    await cart.clearCart();
+    if (!_isExpress) await cart.clearCart();
     if (mounted) {
       _showSuccessDialog(
         'Order Placed Successfully!',
@@ -271,7 +304,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final order = await orderProvider.createOrder(
       addressId: addressProvider.selectedAddress!.id,
       paymentMethod: 'razorpay',
-      items: cart.toOrderItems(),
+      items: _orderItemsPayload(cart),
+      couponCode: _couponCode,
       notes: _couponCode != null ? 'Coupon: $_couponCode' : null,
     );
     if (order == null) throw Exception('Failed to create order');
@@ -322,16 +356,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final order = await orderProvider.createOrder(
         addressId: addressProvider.selectedAddress!.id,
         paymentMethod: 'wallet',
-        items: cart.toOrderItems(),
+        items: _orderItemsPayload(cart),
+        couponCode: _couponCode,
         notes: _couponCode != null ? 'Coupon: $_couponCode' : null,
         walletAmountUsed: total,
       );
-      await cart.clearCart();
+      if (!_isExpress) await cart.clearCart();
+      if (!mounted) return;
       await context.read<WalletProvider>().fetchBalance();
       if (mounted) {
         _showSuccessDialog(
           'Order Placed Successfully!',
-          'Rs. ${total.toStringAsFixed(0)} paid from wallet.',
+          '${formatCurrency(total)} paid from wallet.',
           orderNumber: order?.orderNumber,
         );
       }
@@ -341,7 +377,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final order = await orderProvider.createOrder(
         addressId: addressProvider.selectedAddress!.id,
         paymentMethod: 'partial_wallet',
-        items: cart.toOrderItems(),
+        items: _orderItemsPayload(cart),
+        couponCode: _couponCode,
         notes: _couponCode != null ? 'Coupon: $_couponCode' : null,
         walletAmountUsed: walletBalance,
       );
@@ -364,7 +401,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'amount': (remaining * 100).toInt(),
           'name': 'Magray Orchards',
           'order_id': razorpayOrderId,
-          'description': 'Order ${order.orderNumber} (₹${walletBalance.toStringAsFixed(0)} from wallet)',
+          'description': 'Order ${order.orderNumber} (${formatCurrency(walletBalance)} from wallet)',
           'prefill': {
             'contact': userPhone,
             'email': userEmail,
@@ -388,17 +425,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void _handlePaymentSuccess(dynamic response) async {
     // IdentityMap uses identical() — convert to regular map for safe key lookup
     final data = Map<String, String>.from(response as Map);
-    final _oid = data['razorpay_order_id'] ?? '';
-    final _pid = data['razorpay_payment_id'] ?? '';
-    final _sig = data['razorpay_signature'] ?? '';
+    final oid = data['razorpay_order_id'] ?? '';
+    final pid = data['razorpay_payment_id'] ?? '';
+    final sig = data['razorpay_signature'] ?? '';
     try {
       await ApiService.post('/payment/razorpay/verify', body: {
-        'razorpay_order_id': _oid,
-        'razorpay_payment_id': _pid,
-        'razorpay_signature': _sig,
+        'razorpay_order_id': oid,
+        'razorpay_payment_id': pid,
+        'razorpay_signature': sig,
       });
       if (mounted) {
-        await context.read<CartProvider>().clearCart();
+        if (!_isExpress) await context.read<CartProvider>().clearCart();
+        if (!mounted) return;
         final orderNum = context.read<OrderProvider>().lastCreatedOrder?.orderNumber;
         _showSuccessDialog(
           'Payment Successful!',
@@ -409,7 +447,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e is ApiException ? e.message : 'Payment could not be verified. Please check your order status.'}'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e is ApiException ? e.message : 'Payment could not be verified. Please check your order status.'), backgroundColor: Colors.red),
         );
       }
     }
@@ -484,84 +522,182 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final cart = context.watch<CartProvider>();
     final addressProvider = context.watch<AddressProvider>();
     final cs = Theme.of(context).colorScheme;
+    final activeItems = _activeItems(cart);
     final subtotal = _getSubtotal(cart);
     final tax = _getTax(subtotal);
     final shipping = _getShipping(addressProvider);
     final total = subtotal + tax + shipping - _couponDiscount;
+    final hasAddress = addressProvider.selectedAddress != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Checkout'),
+        title: Text(_isExpress ? 'Express Checkout' : 'Checkout'),
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
       ),
-      body: cart.items.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Your cart is empty', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                ],
-              ),
+      body: activeItems.isEmpty
+          ? EmptyState(
+              icon: Icons.shopping_cart_outlined,
+              title: 'Your cart is empty',
+              message: 'Add farming supplies before heading to checkout',
+              actionLabel: 'Browse Products',
+              actionIcon: Icons.storefront_outlined,
+              onAction: () => AppNavigation.goToTab(context, 0),
             )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildFreeShippingBanner(subtotal),
-                  const SizedBox(height: 16),
-                  _buildSectionTitle('Delivery Address'),
-                  const SizedBox(height: 8),
-                  _buildAddressSection(addressProvider),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Order Summary'),
-                  const SizedBox(height: 8),
-                  _buildOrderSummary(cart),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Coupon Code'),
-                  const SizedBox(height: 8),
-                  _buildCouponSection(),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Price Details'),
-                  const SizedBox(height: 8),
-                  _buildPriceDetails(subtotal, tax, shipping, total),
-                  if (ShopConfig.maxOrderAmount > 0 && total > ShopConfig.maxOrderAmount) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'This order exceeds the maximum order amount of Rs. ${ShopConfig.maxOrderAmount.toStringAsFixed(0)}. Please reduce items to place this order.',
-                              style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStepProgressHeader(cs, hasAddress: hasAddress),
+                      const SizedBox(height: 16),
+                      _buildFreeShippingBanner(subtotal),
+                      const SizedBox(height: 16),
+                      _buildSectionTitle('Delivery Address'),
+                      const SizedBox(height: 8),
+                      _buildAddressSection(addressProvider),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Order Summary'),
+                      const SizedBox(height: 8),
+                      _buildOrderSummary(cart),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Coupon Code'),
+                      const SizedBox(height: 8),
+                      _buildCouponSection(),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Price Details'),
+                      const SizedBox(height: 8),
+                      _buildPriceDetails(subtotal, tax, shipping, total),
+                      if (ShopConfig.maxOrderAmount > 0 && total > ShopConfig.maxOrderAmount) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Payment Method'),
-                  const SizedBox(height: 8),
-                  _buildPaymentMethod(),
-                  const SizedBox(height: 24),
-                  _buildPlaceOrderButton(total),
-                  const SizedBox(height: 24),
-                ],
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'This order exceeds the maximum order amount of ${formatCurrency(ShopConfig.maxOrderAmount)}. Please reduce items to place this order.',
+                                  style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Payment Method'),
+                      const SizedBox(height: 8),
+                      _buildPaymentMethod(total),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
               ),
             ),
+      bottomNavigationBar: activeItems.isEmpty
+          ? null
+          : Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLowest,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: _buildPlaceOrderButton(total),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildStepProgressHeader(ColorScheme cs, {required bool hasAddress}) {
+    final steps = [
+      ('Address', true, hasAddress),
+      ('Review', hasAddress, hasAddress),
+      ('Pay', hasAddress, false),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: List.generate(steps.length, (i) {
+            final (label, active, done) = steps[i];
+            return Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: done
+                          ? cs.primary
+                          : active
+                              ? cs.secondary
+                              : Colors.grey.shade300,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: done
+                          ? const Icon(Icons.check, size: 14, color: Colors.white)
+                          : Text(
+                              '${i + 1}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? cs.primary : Colors.grey,
+                      ),
+                    ),
+                  ),
+                  if (i < steps.length - 1)
+                    Expanded(
+                      child: Container(
+                        height: 2,
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        color: done ? cs.primary : Colors.grey.shade300,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ),
     );
   }
 
@@ -599,7 +735,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Free shipping on orders above Rs.${threshold.toStringAsFixed(0)}. Add Rs. ${remaining.toStringAsFixed(0)} more!',
+                'Free shipping on orders above ${formatCurrency(threshold)}. Add ${formatCurrency(remaining)} more!',
                 style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
               ),
             ),
@@ -664,37 +800,106 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Column(
       children: [
-        ...addressProvider.addresses.map((address) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: RadioListTile<int>(
-              value: address.id,
-              groupValue: _selectedAddressId,
-              onChanged: (value) {
-                setState(() {
-                  _selectedAddressId = value;
-                  _apiShipping = null;
-                });
-                addressProvider.selectAddress(address.id);
-                _fetchShippingForPincode(address.pincode);
-              },
-              activeColor: cs.primary,
-              title: Text(address.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(address.fullAddress, maxLines: 2, overflow: TextOverflow.ellipsis),
-              secondary: address.isDefault
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text('Default', style: TextStyle(fontSize: 10, color: cs.primary, fontWeight: FontWeight.bold)),
-                    )
-                  : null,
+        RadioGroup<int>(
+          groupValue: _selectedAddressId,
+          onChanged: (value) {
+            if (value == null) return;
+            final selected = addressProvider.addresses.firstWhere((a) => a.id == value);
+            setState(() {
+              _selectedAddressId = value;
+              _apiShipping = null;
+            });
+            addressProvider.selectAddress(selected.id);
+            _fetchShippingForPincode(selected.pincode);
+          },
+          child: Column(
+            children: addressProvider.addresses.map((address) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: RadioListTile<int>(
+                  value: address.id,
+                  activeColor: cs.primary,
+                  title: Text(address.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(address.fullAddress, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  secondary: address.isDefault
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('Default', style: TextStyle(fontSize: 10, color: cs.primary, fontWeight: FontWeight.bold)),
+                        )
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (_shippingLoading || _serviceable != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: _shippingLoading
+                  ? cs.primary.withValues(alpha: 0.06)
+                  : (_serviceable == true
+                      ? Colors.green.shade50
+                      : Colors.orange.shade50),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _shippingLoading
+                    ? cs.primary.withValues(alpha: 0.2)
+                    : (_serviceable == true
+                        ? Colors.green.shade200
+                        : Colors.orange.shade200),
+              ),
             ),
-          );
-        }),
+            child: Row(
+              children: [
+                if (_shippingLoading)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                  )
+                else
+                  Icon(
+                    _serviceable == true
+                        ? Icons.check_circle_outline
+                        : Icons.info_outline,
+                    size: 18,
+                    color: _serviceable == true
+                        ? Colors.green.shade700
+                        : Colors.orange.shade800,
+                  ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _shippingLoading
+                        ? 'Checking delivery availability...'
+                        : (_serviceable == true
+                            ? (_estimatedDays != null
+                                ? 'Delivery available • Est. $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}'
+                                : 'Delivery available to selected pincode')
+                            : (_shippingMessage ?? 'Delivery may not be available for this pincode')),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: _shippingLoading
+                          ? cs.primary
+                          : (_serviceable == true
+                              ? Colors.green.shade800
+                              : Colors.orange.shade900),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -718,6 +923,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildOrderSummary(CartProvider cart) {
     final cs = Theme.of(context).colorScheme;
+    final items = _activeItems(cart);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
@@ -725,10 +931,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: cart.items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final item = cart.items[index];
+              final item = items[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
@@ -740,7 +946,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         color: cs.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.eco, color: cs.primary, size: 22),
+                      child: item.product.image != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: AppNetworkImage(
+                                imageUrl:
+                                    '${ApiConfig.imageBaseUrl}${item.product.image}',
+                                fit: BoxFit.cover,
+                                errorWidget: (_, _, _) =>
+                                    Icon(Icons.eco, color: cs.primary, size: 22),
+                              ),
+                            )
+                          : Icon(Icons.eco, color: cs.primary, size: 22),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -748,7 +965,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.product.name,
+                            item.variant != null
+                                ? '${item.product.name} (${item.variant!.name})'
+                                : item.product.name,
                             style: const TextStyle(fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -761,7 +980,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     Text(
-                      'Rs. ${(item.product.price * item.quantity).toStringAsFixed(0)}',
+                      formatCurrency(item.unitPrice * item.quantity),
                       style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
                     ),
                   ],
@@ -852,10 +1071,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildPriceRow('Subtotal', 'Rs. ${subtotal.toStringAsFixed(0)}'),
+            _buildPriceRow('Subtotal', formatCurrency(subtotal)),
             if (tax > 0) ...[
               const SizedBox(height: 8),
-              _buildPriceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${tax.toStringAsFixed(0)}'),
+              _buildPriceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', formatCurrency(tax)),
             ],
             const SizedBox(height: 8),
             Row(
@@ -865,7 +1084,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _shippingLoading
                     ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))
                     : Text(
-                        _freeDelivery ? 'Free' : 'Rs. ${shipping.toStringAsFixed(0)}',
+                        _freeDelivery ? 'Free' : formatCurrency(shipping),
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           color: _freeDelivery ? Colors.green : null,
@@ -880,7 +1099,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   const Text('Estimated Delivery', style: TextStyle(color: Colors.grey)),
                   Text(
-                    'In ${_estimatedDays} day${_estimatedDays == 1 ? '' : 's'}',
+                    'In $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -888,7 +1107,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
             if (_couponApplied && _couponDiscount > 0) ...[
               const SizedBox(height: 8),
-              _buildPriceRow('Coupon Discount', '- Rs. ${_couponDiscount.toStringAsFixed(0)}', isDiscount: true),
+              _buildPriceRow('Coupon Discount', '- ${formatCurrency(_couponDiscount)}', isDiscount: true),
             ],
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
@@ -902,7 +1121,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Rs. ${total.toStringAsFixed(0)}',
+                  formatCurrency(total),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -933,54 +1152,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildPaymentMethod() {
+  Widget _buildPaymentMethod(double total) {
     final cs = Theme.of(context).colorScheme;
-    final total = _calculateTotal(
-      context.read<CartProvider>(),
-      context.read<AddressProvider>(),
-    );
     final walletCanPayFull = _walletBalance >= total && total > 0;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          if (_walletBalance > 0) ...[
-            RadioListTile<String>(
-              value: 'wallet',
-              groupValue: _paymentMethod,
-              onChanged: (value) => setState(() => _paymentMethod = value!),
-              activeColor: cs.primary,
-              title: Text('Pay with Wallet'),
-              subtitle: Text(
-                walletCanPayFull
-                    ? 'Balance: ₹${_walletBalance.toStringAsFixed(0)} — covers full amount'
-                    : 'Balance: ₹${_walletBalance.toStringAsFixed(0)} — ₹${(total - _walletBalance).toStringAsFixed(0)} via Razorpay',
+      child: RadioGroup<String>(
+        groupValue: _paymentMethod,
+        onChanged: (value) {
+          if (value != null) setState(() => _paymentMethod = value);
+        },
+        child: Column(
+          children: [
+            if (_walletBalance > 0) ...[
+              RadioListTile<String>(
+                value: 'wallet',
+                activeColor: cs.primary,
+                title: const Text('Pay with Wallet'),
+                subtitle: Text(
+                  walletCanPayFull
+                      ? 'Balance: ${formatCurrency(_walletBalance)} — covers full amount'
+                      : 'Balance: ${formatCurrency(_walletBalance)} — ${formatCurrency(total - _walletBalance)} via Razorpay',
+                ),
+                secondary: Icon(Icons.account_balance_wallet, color: cs.primary),
               ),
-              secondary: Icon(Icons.account_balance_wallet, color: cs.primary),
+              const Divider(height: 1),
+            ],
+            RadioListTile<String>(
+              value: 'cod',
+              activeColor: cs.primary,
+              title: const Text('Cash on Delivery'),
+              subtitle: const Text('Pay when your order arrives'),
+              secondary: Icon(Icons.money, color: cs.primary),
             ),
             const Divider(height: 1),
+            RadioListTile<String>(
+              value: 'razorpay',
+              activeColor: cs.primary,
+              title: const Text('Pay with Razorpay'),
+              subtitle: const Text('UPI, Cards, Net Banking & more'),
+              secondary: Icon(Icons.credit_card, color: cs.primary),
+            ),
           ],
-          RadioListTile<String>(
-            value: 'cod',
-            groupValue: _paymentMethod,
-            onChanged: (value) => setState(() => _paymentMethod = value!),
-            activeColor: cs.primary,
-            title: const Text('Cash on Delivery'),
-            subtitle: const Text('Pay when your order arrives'),
-            secondary: Icon(Icons.money, color: cs.primary),
-          ),
-          const Divider(height: 1),
-          RadioListTile<String>(
-            value: 'razorpay',
-            groupValue: _paymentMethod,
-            onChanged: (value) => setState(() => _paymentMethod = value!),
-            activeColor: cs.primary,
-            title: const Text('Pay with Razorpay'),
-            subtitle: const Text('UPI, Cards, Net Banking & more'),
-            secondary: Icon(Icons.credit_card, color: cs.primary),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -991,14 +1206,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     switch (_paymentMethod) {
       case 'wallet':
         buttonText = _walletBalance >= total
-            ? 'Pay ₹${total.toStringAsFixed(0)} from Wallet'
-            : 'Pay ₹${_walletBalance.toStringAsFixed(0)} from Wallet + Razorpay';
+            ? 'Pay ${formatCurrency(total)} from Wallet'
+            : 'Pay ${formatCurrency(_walletBalance)} from Wallet + Razorpay';
         break;
       case 'cod':
-        buttonText = 'Place Order - Rs. ${total.toStringAsFixed(0)}';
+        buttonText = 'Place Order - ${formatCurrency(total)}';
         break;
       default:
-        buttonText = 'Pay Now - Rs. ${total.toStringAsFixed(0)}';
+        buttonText = 'Pay Now - ${formatCurrency(total)}';
     }
 
     return SizedBox(

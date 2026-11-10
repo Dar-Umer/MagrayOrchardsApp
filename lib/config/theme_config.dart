@@ -68,7 +68,7 @@ class ThemeConfig {
   static MaterialColor buildMaterialSwatch(String paletteName) {
     final colors = getPaletteColors(paletteName);
     return MaterialColor(
-      colors[600]!.value,
+      colors[600]!.toARGB32(),
       {
         50: colors[50]!,
         100: colors[100]!,

@@ -266,6 +266,24 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await ApiService.put('/profile/password', body: {
+        'current_password': currentPassword,
+        'password': newPassword,
+        'password_confirmation': newPassword,
+      });
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Update the local user's default delivery address (pincode/city/state).
   void setDefaultAddress({
     String? pincode,

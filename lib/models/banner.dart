@@ -3,6 +3,7 @@ class AppBanner {
   final String? title;
   final String? subtitle;
   final String? image;
+  final String? link;
   final String? linkType;
   final String? linkValue;
   final int sortOrder;
@@ -12,6 +13,7 @@ class AppBanner {
     this.title,
     this.subtitle,
     this.image,
+    this.link,
     this.linkType,
     this.linkValue,
     this.sortOrder = 0,
@@ -19,13 +21,14 @@ class AppBanner {
 
   factory AppBanner.fromJson(Map<String, dynamic> json) {
     return AppBanner(
-      id: json['id'] ?? 0,
-      title: json['title'],
-      subtitle: json['subtitle'],
-      image: json['image'],
-      linkType: json['link_type'],
-      linkValue: json['link_value'],
-      sortOrder: json['sort_order'] ?? 0,
+      id: json['id'] is num ? (json['id'] as num).toInt() : 0,
+      title: json['title']?.toString(),
+      subtitle: json['subtitle']?.toString(),
+      image: json['image']?.toString(),
+      link: json['link']?.toString(),
+      linkType: json['link_type']?.toString(),
+      linkValue: json['link_value']?.toString(),
+      sortOrder: json['sort_order'] is num ? (json['sort_order'] as num).toInt() : 0,
     );
   }
 }

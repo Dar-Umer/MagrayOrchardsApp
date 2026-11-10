@@ -6,6 +6,7 @@ import '../models/service_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
+import '../utils/formatters.dart';
 import 'login_screen.dart';
 import 'my_bookings_screen.dart';
 
@@ -236,7 +237,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   void _showPaymentPending(int bookingId, double amount) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
-          'Booking created, but payment is incomplete (₹${amount.toStringAsFixed(0)}). You can pay from My Bookings.'),
+          'Booking created, but payment is incomplete (${formatCurrency(amount)}). You can pay from My Bookings.'),
       backgroundColor: Colors.orange,
       action: SnackBarAction(
         label: 'VIEW',
@@ -303,7 +304,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       switch (result) {
         case BookingPaymentResult.success:
           _toast(
-            'Booking confirmed! Payment of ₹${amount.toStringAsFixed(0)} received.',
+            'Booking confirmed! Payment of ${formatCurrency(amount)} received.',
           );
           Navigator.push(context,
               MaterialPageRoute(builder: (_) => const MyBookingsScreen()));
@@ -335,9 +336,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       appBar: AppBar(title: Text(service.name)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             Container(
               width: double.infinity,
               height: 200,
@@ -368,7 +372,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             Row(
               children: [
                 Text(
-                    '₹${service.basePrice.toStringAsFixed(0)}',
+                    formatCurrency(service.basePrice),
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -508,13 +512,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             color: Colors.white, strokeWidth: 2.5),
                       )
                     : Text(
-                        'Book & Pay — ₹${_totalAmount.toStringAsFixed(0)}',
+                        'Book & Pay — ${formatCurrency(_totalAmount)}',
                         style:
                             const TextStyle(fontSize: 16, color: Colors.white)),
               ),
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }
@@ -661,13 +667,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             const Text('Price Estimate',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _quoteRow('Base charge', '₹${base.toStringAsFixed(0)}'),
+            _quoteRow('Base charge', formatCurrency(base)),
             _quoteRow(
               'Travel (${distance.toStringAsFixed(1)} km)',
-              '₹${travel.toStringAsFixed(0)}',
+              formatCurrency(travel),
             ),
             const Divider(height: 20),
-            _quoteRow('Total', '₹${total.toStringAsFixed(0)}',
+            _quoteRow('Total', formatCurrency(total),
                 bold: true, highlighted: true),
             if (estimated) ...[
               const SizedBox(height: 6),

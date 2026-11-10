@@ -6,6 +6,7 @@ import '../models/subscription_plan.dart';
 import '../services/api_service.dart';
 import '../services/razorpay_helper.dart';
 import '../services/razorpay_factory.dart';
+import '../utils/formatters.dart';
 
 class SubscriptionPlansScreen extends StatefulWidget {
   const SubscriptionPlansScreen({super.key});
@@ -90,11 +91,11 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     String confirmMessage;
     if (plan.isUpgrade && plan.proration != null) {
       confirmMessage = 'Upgrade to ${plan.name}?\n\n'
-          'Original: ₹${plan.proration!.originalPrice.toStringAsFixed(0)}\n'
-          'Credit: −₹${plan.proration!.credit.toStringAsFixed(0)} (${plan.proration!.remainingDays} days remaining)\n'
-          'You pay: ₹${plan.proration!.finalPrice.toStringAsFixed(0)}';
+          'Original: ${formatCurrency(plan.proration!.originalPrice)}\n'
+          'Credit: −${formatCurrency(plan.proration!.credit)} (${plan.proration!.remainingDays} days remaining)\n'
+          'You pay: ${formatCurrency(plan.proration!.finalPrice)}';
     } else {
-      confirmMessage = 'Subscribe to ${plan.name} for ₹${plan.price.toStringAsFixed(0)}/${plan.billingPeriod}?';
+      confirmMessage = 'Subscribe to ${plan.name} for ${formatCurrency(plan.price)}/${plan.billingPeriod}?';
     }
 
     final confirmed = await showDialog<bool>(
@@ -191,7 +192,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Subscription Plans'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _processingPayment
           ? const Center(
@@ -231,12 +231,17 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ),
                   );
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: provider.plans.length,
-                  itemBuilder: (context, index) {
-                    return _PlanCard(plan: provider.plans[index], onSubscribe: _onSubscribe);
-                  },
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: provider.plans.length,
+                      itemBuilder: (context, index) {
+                        return _PlanCard(plan: provider.plans[index], onSubscribe: _onSubscribe);
+                      },
+                    ),
+                  ),
                 );
               },
             ),
@@ -382,7 +387,7 @@ class _PlanCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '₹${plan.proration!.originalPrice.toStringAsFixed(0)}',
+                    formatCurrency(plan.proration!.originalPrice),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -402,7 +407,7 @@ class _PlanCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '₹${plan.proration!.finalPrice.toStringAsFixed(0)}',
+                    formatCurrency(plan.proration!.finalPrice),
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.green.shade600),
                   ),
                   Padding(
@@ -426,7 +431,7 @@ class _PlanCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Credit: ₹${plan.proration!.credit.toStringAsFixed(0)} (${plan.proration!.remainingDays} days remaining on ${plan.proration!.currentPlanName})',
+                        'Credit: ${formatCurrency(plan.proration!.credit)} (${plan.proration!.remainingDays} days remaining on ${plan.proration!.currentPlanName})',
                         style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -437,7 +442,7 @@ class _PlanCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('₹${plan.price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                  Text(formatCurrency(plan.price), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 4),
                     child: Text('/ ${plan.billingPeriod}', style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
@@ -455,7 +460,7 @@ class _PlanCard extends StatelessWidget {
                   children: [
                     Icon(Icons.check_circle, size: 14, color: Colors.green.shade500),
                     const SizedBox(width: 8),
-                    Text(f, style: const TextStyle(fontSize: 13)),
+                    Expanded(child: Text(f, style: const TextStyle(fontSize: 13))),
                   ],
                 ),
               )),
@@ -501,7 +506,7 @@ class _PlanCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Upgrade — ₹${plan.proration!.finalPrice.toStringAsFixed(0)}'),
+                  child: Text('Upgrade — ${formatCurrency(plan.proration!.finalPrice)}'),
                 ),
               )
             else
@@ -515,7 +520,7 @@ class _PlanCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Subscribe — ₹${plan.price.toStringAsFixed(0)}/${plan.billingPeriod}'),
+                  child: Text('Subscribe — ${formatCurrency(plan.price)}/${plan.billingPeriod}'),
                 ),
               ),
           ],

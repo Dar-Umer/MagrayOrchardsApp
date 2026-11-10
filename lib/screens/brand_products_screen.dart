@@ -40,11 +40,11 @@ class _BrandProductsScreenState extends State<BrandProductsScreen> {
       ),
       body: Consumer<ProductProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading && provider.products.isEmpty) {
+          if (provider.brandLoading && provider.brandProducts.isEmpty) {
             return _buildShimmer();
           }
 
-          if (provider.products.isEmpty) {
+          if (provider.brandProducts.isEmpty) {
             return _buildEmpty();
           }
 
@@ -65,15 +65,10 @@ class _BrandProductsScreenState extends State<BrandProductsScreen> {
               },
               child: GridView.builder(
                 padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.68,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: provider.products.length,
+                gridDelegate: responsiveProductGridDelegate(),
+                itemCount: provider.brandProducts.length,
                 itemBuilder: (context, index) {
-                  final product = provider.products[index];
+                  final product = provider.brandProducts[index];
                   return ProductCard(
                     product: product,
                     onTap: () => Navigator.push(
@@ -96,12 +91,7 @@ class _BrandProductsScreenState extends State<BrandProductsScreen> {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.68,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
+      gridDelegate: responsiveProductGridDelegate(),
       itemCount: 6,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(

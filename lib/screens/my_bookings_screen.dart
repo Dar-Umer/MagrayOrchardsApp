@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/skeleton_box.dart';
 import '../config/api_config.dart';
 import '../models/service_booking.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
+import '../utils/formatters.dart';
 import 'login_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -16,10 +18,21 @@ class MyBookingsScreen extends StatefulWidget {
 }
 
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
+  static const _statuses = ['All', 'Pending', 'Confirmed', 'In Progress', 'Completed', 'Cancelled'];
+
   List<ServiceBookingModel> _bookings = [];
   bool _loading = true;
   String? _error;
   int? _payingId;
+  String? _statusFilter;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -142,23 +155,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (!auth.isLoggedIn) {
       return Scaffold(
         appBar: AppBar(title: const Text('My Bookings')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.lock_outline, size: 80, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Login to view your bookings',
-                  style: TextStyle(fontSize: 18, color: Colors.grey)),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                ),
-                child: const Text('Login', style: TextStyle(color: Colors.white)),
-              ),
-            ],
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Login to view your bookings',
+          message: 'Sign in to check scheduled visits and payments',
+          actionLabel: 'Login',
+          actionIcon: Icons.login,
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
           ),
         ),
       );
@@ -170,32 +175,38 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
+  List<ServiceBookingModel> get _filteredBookings {
+    return _bookings.where((b) {
+      if (_statusFilter != null && b.status.toLowerCase() != _statusFilter) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        return b.serviceName.toLowerCase().contains(q) ||
+            '${b.id}'.contains(q) ||
+            (b.address?.toLowerCase().contains(q) ?? false);
+      }
+      return true;
+    }).toList();
+  }
+
   Widget _buildBody(ColorScheme cs) {
     if (_loading) {
-      return Center(child: CircularProgressIndicator(color: cs.primary));
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: const ShimmerCardList(itemCount: 4, itemHeight: 148),
+        ),
+      );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _loadBookings,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
-              ),
-            ],
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load bookings',
+        message: _error,
+        actionLabel: 'Try Again',
+        onAction: _loadBookings,
       );
     }
 
@@ -207,13 +218,97 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       );
     }
 
+    final filtered = _filteredBookings;
+
     return RefreshIndicator(
       onRefresh: _loadBookings,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _bookings.length,
-        itemBuilder: (context, index) =>
-            _buildBookingCard(_bookings[index], cs),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _statuses.map((label) {
+                        final normalized = label.toLowerCase().replaceAll(' ', '_');
+                        final isActive =
+                            (label == 'All' && _statusFilter == null) ||
+                                _statusFilter == normalized;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                            selected: isActive,
+                            onSelected: (_) => setState(() {
+                              _statusFilter = label == 'All' ? null : normalized;
+                            }),
+                            selectedColor: cs.primary.withValues(alpha: 0.15),
+                            checkmarkColor: cs.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'Search by service or address...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+              ),
+              if (filtered.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    icon: Icons.search_off,
+                    title: 'No bookings match your filters',
+                    message: 'Try a different status or search term',
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _buildBookingCard(filtered[index], cs),
+                      childCount: filtered.length,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -267,7 +362,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                           Icon(Icons.event, size: 14, color: Colors.grey[600]),
                           const SizedBox(width: 4),
                           Text(
-                            '${date.day}/${date.month}/${date.year}',
+                            formatDate(date),
                             style: TextStyle(
                                 fontSize: 13, color: Colors.grey[700]),
                           ),
@@ -354,7 +449,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 Text('Total: ',
                     style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                 Text(
-                  '₹${booking.totalAmount.toStringAsFixed(0)}',
+                  formatCurrency(booking.totalAmount),
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,

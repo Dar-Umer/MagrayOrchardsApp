@@ -6,6 +6,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../models/reel.dart';
 import '../providers/reels_provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/formatters.dart';
 import 'login_screen.dart';
 import 'product_detail_screen.dart';
 import 'reels_comments_sheet.dart';
@@ -371,7 +372,7 @@ class _ReelViewState extends State<_ReelView> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'Buy Now · ₹${product.price.toStringAsFixed(0)}',
+                          'Buy Now · ${formatCurrency(product.price)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/api_config.dart';
@@ -8,6 +9,7 @@ import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
 import '../services/api_service.dart';
 import '../services/shop_config.dart';
+import '../utils/formatters.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order? order;
@@ -326,24 +328,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatusTimeline(cs),
-                  const SizedBox(height: 20),
-                  _buildActionButtons(cs),
-                  const SizedBox(height: 20),
-                  _buildItemsSection(cs),
-                  const SizedBox(height: 16),
-                  _buildPriceSection(cs),
-                  const SizedBox(height: 16),
-                  if (order.paymentMethod != null) _buildPaymentSection(cs),
-                  const SizedBox(height: 16),
-                  if (order.shipment != null) _buildShipmentSection(cs),
-                  const SizedBox(height: 16),
-                  if (order.shippingAddress != null) _buildAddressSection(),
-                  const SizedBox(height: 24),
-                ],
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStatusTimeline(cs),
+                      const SizedBox(height: 20),
+                      _buildActionButtons(cs),
+                      const SizedBox(height: 20),
+                      _buildItemsSection(cs),
+                      const SizedBox(height: 16),
+                      _buildPriceSection(cs),
+                      const SizedBox(height: 16),
+                      if (order.paymentMethod != null) _buildPaymentSection(cs),
+                      const SizedBox(height: 16),
+                      if (order.shipment != null) _buildShipmentSection(cs),
+                      const SizedBox(height: 16),
+                      if (order.shippingAddress != null) _buildAddressSection(),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
               ),
             ),
     );
@@ -380,7 +387,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: const TextStyle(color: Colors.grey, fontSize: 13)),
               ],
               if (_o.createdAt != null)
-                Text('Placed on ${_o.createdAt!.day}/${_o.createdAt!.month}/${_o.createdAt!.year}',
+                Text('Placed on ${formatDate(_o.createdAt)}',
                     style: const TextStyle(color: Colors.grey, fontSize: 13)),
             ],
           ),
@@ -442,7 +449,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             if (_o.createdAt != null) ...[
               const SizedBox(height: 10),
               Center(
-                child: Text('Placed on ${_o.createdAt!.day}/${_o.createdAt!.month}/${_o.createdAt!.year}',
+                child: Text('Placed on ${formatDate(_o.createdAt)}',
                     style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ),
             ],
@@ -523,7 +530,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                   ),
-                  Text('Rs. ${item.totalPrice.toStringAsFixed(0)}',
+                  Text(formatCurrency(item.totalPrice),
                       style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
                 ],
               ),
@@ -554,19 +561,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _priceRow('Subtotal', 'Rs. ${_o.subtotal.toStringAsFixed(0)}'),
+                _priceRow('Subtotal', formatCurrency(_o.subtotal)),
                 if (_o.tax > 0)
-                  _priceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', 'Rs. ${_o.tax.toStringAsFixed(0)}'),
+                  _priceRow('Tax (${ShopConfig.taxRate.toStringAsFixed(0)}%)', formatCurrency(_o.tax)),
                 if (_o.shippingCharge > 0)
-                  _priceRow('Shipping', 'Rs. ${_o.shippingCharge.toStringAsFixed(0)}'),
+                  _priceRow('Shipping', formatCurrency(_o.shippingCharge)),
                 if (_o.pincodeDeliveryCharge > 0)
-                  _priceRow('Delivery Charge', 'Rs. ${_o.pincodeDeliveryCharge.toStringAsFixed(0)}'),
+                  _priceRow('Delivery Charge', formatCurrency(_o.pincodeDeliveryCharge)),
                 if (_o.discount > 0)
-                  _priceRow('Discount', '- Rs. ${_o.discount.toStringAsFixed(0)}'),
+                  _priceRow('Discount', '- ${formatCurrency(_o.discount)}'),
                 if ((_o.walletAmountUsed ?? 0) > 0)
-                  _priceRow('Paid via Wallet', '- Rs. ${_o.walletAmountUsed!.toStringAsFixed(0)}', color: Colors.green),
+                  _priceRow('Paid via Wallet', '- ${formatCurrency(_o.walletAmountUsed!)}', color: Colors.green),
                 const Divider(),
-                _priceRow('Total', 'Rs. ${_o.totalAmount.toStringAsFixed(0)}', isBold: true),
+                _priceRow('Total', formatCurrency(_o.totalAmount), isBold: true),
               ],
             ),
           ),
@@ -662,7 +669,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(height: 8),
                 ],
                 if (s['tracking_number'] != null) ...[
-                  _shipmentRow(Icons.qr_code, 'Tracking #', s['tracking_number']),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _shipmentRow(
+                          Icons.qr_code,
+                          'Tracking #',
+                          '${s['tracking_number']}',
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Copy tracking number',
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(Icons.copy_rounded, size: 17, color: cs.primary),
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(text: '${s['tracking_number']}'),
+                          );
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: const Text('Tracking number copied'),
+                                backgroundColor: cs.primary,
+                              ),
+                            );
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                 ],
                 _shipmentRow(
@@ -714,10 +749,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildTimelineRow(Map<String, dynamic> entry, ColorScheme cs) {
     final status = entry['status'] ?? '';
     final location = entry['location'] ?? '';
-    final rawDate = entry['date'] ?? '';
-    final date = rawDate is String && rawDate.isNotEmpty
-        ? rawDate.replaceFirst('T', ' ').substring(0, 16)
-        : '';
+    final date = formatDateTime(entry['date']);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(

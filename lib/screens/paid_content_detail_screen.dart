@@ -42,7 +42,6 @@ class _PaidContentDetailScreenState extends State<PaidContentDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_content?.title ?? 'Content'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

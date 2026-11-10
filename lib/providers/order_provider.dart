@@ -45,6 +45,7 @@ class OrderProvider extends ChangeNotifier {
     required int addressId,
     required String paymentMethod,
     required List<Map<String, dynamic>> items,
+    String? couponCode,
     String? notes,
     String? razorpayOrderId,
     String? razorpayPaymentId,
@@ -58,6 +59,9 @@ class OrderProvider extends ChangeNotifier {
         'payment_method': paymentMethod,
         'items': items,
       };
+      if (couponCode != null && couponCode.isNotEmpty) {
+        body['coupon_code'] = couponCode;
+      }
       if (notes != null) body['notes'] = notes;
       if (razorpayOrderId != null) body['razorpay_order_id'] = razorpayOrderId;
       if (razorpayPaymentId != null) {

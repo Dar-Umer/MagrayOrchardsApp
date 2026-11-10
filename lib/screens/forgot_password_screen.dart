@@ -6,7 +6,14 @@ import '../services/api_service.dart';
 import 'home_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  final String? initialPhone;
+  final bool popOnSuccess;
+
+  const ForgotPasswordScreen({
+    super.key,
+    this.initialPhone,
+    this.popOnSuccess = false,
+  });
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -22,6 +29,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _otpSent = false;
   String? _error;
   int _resendSeconds = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialPhone?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _phoneController.text = _cleanPhone(initial);
+    }
+  }
 
   @override
   void dispose() {
@@ -87,11 +103,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final success = await auth.resetPassword(_otp, _newPasswordController.text);
       if (success && mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Password reset successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
         );
+        if (widget.popOnSuccess) {
+          Navigator.pop(context, true);
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       setState(() { _error = e is ApiException ? e.message : 'Could not reset password. Please try again.'; });

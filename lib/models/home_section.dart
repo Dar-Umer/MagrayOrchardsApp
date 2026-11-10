@@ -27,21 +27,26 @@ class HomeSection {
   factory HomeSection.fromJson(Map<String, dynamic> json) {
     return HomeSection(
       type: json['type']?.toString() ?? '',
-      enabled: json['enabled'] ?? true,
+      enabled: json['enabled'] == null ? true : json['enabled'] == true || json['enabled'] == 1,
       title: json['title']?.toString(),
       source: json['source']?.toString(),
       layout: json['layout']?.toString(),
-      rows: json['rows'] is num ? (json['rows'] as num).toInt() : 1,
-      limit: json['limit'] is num ? (json['limit'] as num).toInt() : null,
-      categoryId:
-          json['category_id'] is num ? (json['category_id'] as num).toInt() : null,
-      brandId: json['brand_id'] is num ? (json['brand_id'] as num).toInt() : null,
+      rows: _toInt(json['rows']) ?? 1,
+      limit: _toInt(json['limit']),
+      categoryId: _toInt(json['category_id']),
+      brandId: _toInt(json['brand_id']),
     );
   }
+
+  static int? _toInt(dynamic v) =>
+      v is num ? v.toInt() : int.tryParse(v?.toString() ?? '');
 
   bool get isCarousel => layout == 'carousel';
   bool get isGrid => layout == 'grid';
   int get rowCount => (rows ?? 1).clamp(1, 6);
+  int get itemsPerRow =>
+      (limit != null && limit! > 0) ? limit!.clamp(1, 50) : 10;
+  int get fetchLimit => isGrid ? rowCount * 2 : rowCount * itemsPerRow;
 }
 
 /// Ordered collection of home sections parsed from `shop.home_layout`.

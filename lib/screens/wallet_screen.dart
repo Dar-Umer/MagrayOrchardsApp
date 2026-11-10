@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/skeleton_box.dart';
+import '../widgets/wallet_debit_card.dart';
+import '../providers/auth_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../models/wallet.dart';
+import '../services/shop_config.dart';
+import '../utils/formatters.dart';
 import 'wallet_topup_screen.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -19,13 +24,16 @@ class _WalletScreenState extends State<WalletScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WalletProvider>().fetchBalance();
+      final wallet = context.read<WalletProvider>();
+      wallet.fetchBalance();
+      wallet.fetchTransactions();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final wallet = context.watch<WalletProvider>();
+    final auth = context.watch<AuthProvider>();
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -39,59 +47,43 @@ class _WalletScreenState extends State<WalletScreen> {
           await wallet.fetchBalance();
           await wallet.fetchTransactions(type: _filterType);
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildBalanceCard(wallet, cs),
-            const SizedBox(height: 20),
-            _buildTopUpButton(cs),
-            const SizedBox(height: 24),
-            _buildTransactionHeader(cs),
-            const SizedBox(height: 8),
-            _buildFilterChips(cs),
-            const SizedBox(height: 8),
-            _buildTransactionList(wallet, cs),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildBalanceCard(wallet, auth, cs),
+                const SizedBox(height: 20),
+                _buildTopUpButton(cs),
+                const SizedBox(height: 24),
+                _buildTransactionHeader(cs),
+                const SizedBox(height: 8),
+                _buildFilterChips(cs),
+                const SizedBox(height: 8),
+                _buildTransactionList(wallet, cs),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildBalanceCard(WalletProvider wallet, ColorScheme cs) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [cs.primary, cs.primary.withValues(alpha: 0.8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Column(
-          children: [
-            const Text(
-              'Available Balance',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            wallet.isLoading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Text(
-                    '₹${wallet.balance.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ],
-        ),
-      ),
+  Widget _buildBalanceCard(
+    WalletProvider wallet,
+    AuthProvider auth,
+    ColorScheme cs,
+  ) {
+    final user = auth.user;
+    return WalletDebitCard(
+      balance: wallet.balance,
+      cardHolderName: user?.displayName ?? 'Valued Member',
+      brandName: ShopConfig.siteName,
+      userId: user?.id ?? 0,
+      isProMember: user?.isProMember ?? false,
+      isLoading: wallet.isLoading,
+      primaryColor: cs.primary,
     );
   }
 
@@ -156,30 +148,19 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _buildTransactionList(WalletProvider wallet, ColorScheme cs) {
     if (wallet.isLoading && wallet.transactions.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(32),
-        child: CircularProgressIndicator(),
-      ));
+      return const SizedBox(
+        height: 280,
+        child: ShimmerCardList(itemCount: 3, itemHeight: 72),
+      );
     }
 
     if (wallet.errorMessage != null && wallet.transactions.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(wallet.errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => wallet.fetchTransactions(type: _filterType),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
-              ),
-            ],
-          ),
-        ),
+      return EmptyState(
+        icon: Icons.error_outline,
+        title: 'Could not load transactions',
+        message: wallet.errorMessage,
+        actionLabel: 'Try Again',
+        onAction: () => wallet.fetchTransactions(type: _filterType),
       );
     }
 
@@ -195,7 +176,7 @@ class _WalletScreenState extends State<WalletScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: wallet.transactions.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final tx = wallet.transactions[index];
         return _buildTransactionTile(tx, cs);
@@ -232,12 +213,12 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
       subtitle: tx.createdAt != null
           ? Text(
-              '${tx.createdAt!.day}/${tx.createdAt!.month}/${tx.createdAt!.year} ${tx.createdAt!.hour.toString().padLeft(2, '0')}:${tx.createdAt!.minute.toString().padLeft(2, '0')}',
+              formatDateTime(tx.createdAt),
               style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             )
           : null,
       trailing: Text(
-        '$prefix₹${tx.amount.toStringAsFixed(0)}',
+        '$prefix${formatCurrency(tx.amount)}',
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: color,

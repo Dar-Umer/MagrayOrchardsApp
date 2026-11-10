@@ -65,12 +65,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
               },
               child: GridView.builder(
                 padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.68,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
+                gridDelegate: responsiveProductGridDelegate(),
                 itemCount: provider.categoryProducts.length,
                 itemBuilder: (context, index) {
                   final product = provider.categoryProducts[index];
@@ -96,12 +91,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.72,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
+      gridDelegate: responsiveProductGridDelegate(),
       itemCount: 6,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(

@@ -8,6 +8,7 @@ import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/wishlist_provider.dart';
 import '../services/api_service.dart';
+import '../utils/app_navigation.dart';
 import '../widgets/star_rating.dart';
 import '../widgets/review_card.dart';
 import '../widgets/write_review_form.dart';
@@ -127,26 +128,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _addToCart() {
     final cart = context.read<CartProvider>();
-    cart.addItem(_p, quantity: _quantity);
+    cart.addItem(_p, quantity: _quantity, variant: _selectedVariant);
     ScaffoldMessenger.of(context)..hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Added to cart'),
+        content: Text(_selectedVariant != null
+            ? 'Added ${_p.name} (${_selectedVariant!.name}) to cart'
+            : 'Added to cart'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(label: 'VIEW CART', textColor: Colors.white, onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen()));
-        }),
+        action: SnackBarAction(
+          label: 'VIEW CART',
+          textColor: Colors.white,
+          onPressed: () => AppNavigation.openCart(context),
+        ),
       ),
     );
   }
 
-  void _buyNow() {
-    final cart = context.read<CartProvider>();
-    cart.clearCart();
-    cart.addItem(_p, quantity: _quantity);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const CheckoutScreen()));
+  Future<void> _buyNow() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Please login to continue to checkout'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      Navigator.of(context).pushNamed('/login');
+      return;
+    }
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CheckoutScreen(
+            expressItems: [
+              CartItem(
+                product: _p,
+                quantity: _quantity,
+                variant: _selectedVariant,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -168,16 +198,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 foregroundColor: Colors.white,
                 title: Text(_p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
                 actions: [
-                  if (context.read<AuthProvider>().isLoggedIn)
-                    IconButton(
+                  Builder(builder: (context) {
+                    final auth = context.watch<AuthProvider>();
+                    final wishlist = context.watch<WishlistProvider>();
+                    if (!auth.isLoggedIn) return const SizedBox.shrink();
+                    final saved = wishlist.isInWishlist(_p.id);
+                    return IconButton(
+                      tooltip: saved ? 'Remove from Wishlist' : 'Save to Wishlist',
                       icon: Icon(
-                        context.read<WishlistProvider>().isInWishlist(_p.id) ? Icons.favorite : Icons.favorite_border,
-                        color: context.read<WishlistProvider>().isInWishlist(_p.id) ? Colors.white : Colors.white,
+                        saved ? Icons.favorite : Icons.favorite_border,
+                        color: saved ? Colors.redAccent.shade100 : Colors.white,
                       ),
-                      onPressed: () {
-                        context.read<WishlistProvider>().toggleWishlist(_p.id);
+                      onPressed: () async {
+                        final nowSaved = await wishlist.toggleWishlist(_p.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            SnackBar(
+                              content: Text(nowSaved
+                                  ? 'Saved to wishlist'
+                                  : 'Removed from wishlist'),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
                       },
-                    ),
+                    );
+                  }),
                 ],
               ),
               if (isWide)
@@ -365,6 +412,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: Column(
                   children: [
                     Text(v.name, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? Colors.white : Colors.black87, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text('Rs. ${v.price.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: selected ? Colors.white : theme.colorScheme.primary)),
                     if (discount > 0)
                       Text('$discount% off', style: TextStyle(fontSize: 11, color: selected ? Colors.white : Colors.green.shade600, fontWeight: FontWeight.w500)),
                   ],
