@@ -187,15 +187,17 @@ class ApiService {
 
   // ─── Service bookings ─────────────────────────────────────────────────
 
-  /// Price quote for a service at an optional destination. Public.
+  /// Price quote for a service at an optional destination and quantity. Public.
   static Future<Map<String, dynamic>> fetchQuote(
     String slug, {
     double? latitude,
     double? longitude,
+    int? quantity,
   }) async {
     final response = await get('/services/$slug/quote', queryParams: {
       if (latitude != null) 'latitude': latitude.toString(),
       if (longitude != null) 'longitude': longitude.toString(),
+      if (quantity != null) 'quantity': quantity.toString(),
     });
     return Map<String, dynamic>.from((response as Map)['data'] as Map);
   }
@@ -204,10 +206,15 @@ class ApiService {
   static Future<Map<String, Map<String, dynamic>>> fetchAvailabilityRange({
     DateTime? startDate,
     DateTime? endDate,
+    int? serviceId,
+    String? serviceSlug,
   }) async {
     final response = await get('/bookings/availability', queryParams: {
       if (startDate != null) 'start_date': _dateStr(startDate),
       if (endDate != null) 'end_date': _dateStr(endDate),
+      if (serviceId != null) 'service_id': serviceId.toString(),
+      if (serviceSlug != null && serviceSlug.isNotEmpty)
+        'service_slug': serviceSlug,
     });
     final data = Map<String, dynamic>.from((response as Map)['data'] as Map);
     final dates = data['dates'] is Map
@@ -227,6 +234,8 @@ class ApiService {
     String? address,
     String? notes,
     String? orchardDetails,
+    int? quantity,
+    String paymentMethod = 'visit',
   }) async {
     final response = await post('/services/$slug/book', body: {
       'booking_date': _dateStr(bookingDate),
@@ -237,6 +246,8 @@ class ApiService {
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (orchardDetails != null && orchardDetails.isNotEmpty)
         'orchard_details': orchardDetails,
+      if (quantity != null && quantity > 0) 'quantity': quantity,
+      'payment_method': paymentMethod,
     });
     final body = Map<String, dynamic>.from(response as Map);
     return Map<String, dynamic>.from(body['data'] as Map);
@@ -258,6 +269,22 @@ class ApiService {
         .map((item) => ServiceBookingModel.fromJson(
             Map<String, dynamic>.from(item as Map)))
         .toList();
+  }
+
+  /// Fetch a single booking by ID. Auth required.
+  static Future<ServiceBookingModel> fetchBookingDetail(int bookingId) async {
+    final response = await get('/bookings/$bookingId');
+    final body = Map<String, dynamic>.from(response as Map);
+    final data = Map<String, dynamic>.from(body['data'] as Map);
+    return ServiceBookingModel.fromJson(data);
+  }
+
+  /// Cancel a pending unpaid booking. Auth required.
+  static Future<ServiceBookingModel> cancelBooking(int bookingId) async {
+    final response = await patch('/bookings/$bookingId/cancel', body: {});
+    final body = Map<String, dynamic>.from(response as Map);
+    final data = Map<String, dynamic>.from(body['data'] as Map);
+    return ServiceBookingModel.fromJson(data);
   }
 
   /// Create a Razorpay order for a booking. Auth required.

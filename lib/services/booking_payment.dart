@@ -50,11 +50,17 @@ class BookingPayment {
       razorpay.clear();
     });
 
+    final dynamic rawAmount = order['amount'];
+    final double amountInRupees = rawAmount is num
+        ? rawAmount.toDouble()
+        : (double.tryParse(rawAmount?.toString() ?? '') ?? 0.0);
+    final int amountInPaise = (amountInRupees * 100).round();
+
     try {
       razorpay.open({
         'key': order['key'] ?? '',
         'order_id': order['razorpay_order_id'],
-        'amount': (order['amount'] as num).toInt(),
+        'amount': amountInPaise,
         'currency': 'INR',
         'name': 'Magray Orchards',
         'description': description,

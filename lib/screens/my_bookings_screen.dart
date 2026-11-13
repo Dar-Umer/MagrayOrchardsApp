@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
 import '../utils/formatters.dart';
+import 'booking_detail_screen.dart';
 import 'login_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -320,172 +321,271 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         ? 'Pending'
         : booking.paymentStatus[0].toUpperCase() +
             booking.paymentStatus.substring(1);
-    final imageUrl = booking.serviceImage != null
-        ? '${ApiConfig.imageBaseUrl}${booking.serviceImage}'
-        : null;
     final date = booking.bookingDate;
     final canPay = !booking.isPaid && !booking.isCancelled;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      elevation: 0,
+      color: Colors.white,
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: imageUrl != null
-                      ? Image.network(imageUrl,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _placeholder(cs))
-                      : _placeholder(cs),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookingDetailScreen(booking: booking),
+            ),
+          );
+          if (mounted) {
+            _loadBookings();
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Booking Number & Status Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Text(booking.serviceName,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.event, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            formatDate(date),
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.grey[700]),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          booking.bookingNumber,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: cs.primary,
+                            letterSpacing: 0.5,
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time,
-                              size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(booking.timeSlotLabel,
-                                style: TextStyle(
-                                    fontSize: 13, color: Colors.grey[700])),
+                      if (booking.formattedScope != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          booking.formattedScope!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
                           ),
-                        ],
-                      ),
-                      if (booking.address != null &&
-                          booking.address!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.location_on,
-                                size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(booking.address!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontSize: 13, color: Colors.grey[700])),
-                            ),
-                          ],
                         ),
                       ],
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        booking.status.toUpperCase(),
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      booking.status.toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Middle: Service Name & Schedule (List Type)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.construction, color: cs.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                              color: payColor, shape: BoxShape.circle),
+                        Text(
+                          booking.serviceName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(payLabel,
-                            style: TextStyle(
-                                fontSize: 10, color: payColor)),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today,
+                                size: 12, color: Colors.grey.shade600),
+                            const SizedBox(width: 4),
+                            Text(
+                              formatDate(date),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade700),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(Icons.access_time,
+                                size: 12, color: Colors.grey.shade600),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                booking.timeSlotLabel.split('(').first.trim(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey.shade700),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Text('Total: ',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                Text(
-                  formatCurrency(booking.totalAmount),
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: cs.primary),
-                ),
-              ],
-            ),
-            if (canPay) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _payingId == booking.id
-                      ? null
-                      : () => _payNow(booking),
-                  icon: _payingId == booking.id
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.payment, size: 16),
-                  label: const Text('Pay Now',
-                      style: TextStyle(fontSize: 13)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cs.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                ],
+              ),
+
+              if (booking.hasAssignedStaff) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_pin_circle_outlined,
+                          size: 14, color: Colors.green.shade800),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Assigned: ${booking.assignedStaffName!}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ],
+
+              const Divider(height: 20),
+
+              // Bottom Row: Price, Payment Status & Method
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        formatCurrency(booking.totalAmount),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: payColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          payLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: payColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        booking.isPayOnVisit ? 'Pay on Visit' : 'Paid Online',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '• Details',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+
+              if (canPay) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    onPressed: _payingId == booking.id
+                        ? null
+                        : () => _payNow(booking),
+                    icon: _payingId == booking.id
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.payment, size: 14),
+                    label: const Text('Pay Online Now',
+                        style: TextStyle(fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

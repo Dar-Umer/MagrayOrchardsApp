@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
 import '../services/shop_config.dart';
 
-class MaintenanceScreen extends StatelessWidget {
-  const MaintenanceScreen({super.key});
+class MaintenanceScreen extends StatefulWidget {
+  final Future<void> Function()? onRetry;
+  const MaintenanceScreen({super.key, this.onRetry});
+
+  @override
+  State<MaintenanceScreen> createState() => _MaintenanceScreenState();
+}
+
+class _MaintenanceScreenState extends State<MaintenanceScreen> {
+  bool _isChecking = false;
+
+  Future<void> _handleRetry() async {
+    if (_isChecking) return;
+    setState(() => _isChecking = true);
+    try {
+      if (widget.onRetry != null) {
+        await widget.onRetry!();
+      } else {
+        await ShopConfig.load();
+        if (!ShopConfig.maintenanceEnabled && mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +38,7 @@ class MaintenanceScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -60,8 +85,27 @@ class MaintenanceScreen extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
-              const CircularProgressIndicator(),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isChecking ? null : _handleRetry,
+                  icon: _isChecking
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                  label: Text(_isChecking ? 'Checking...' : 'Check Again'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

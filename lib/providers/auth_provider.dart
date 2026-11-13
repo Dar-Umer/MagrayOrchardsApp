@@ -3,6 +3,14 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/push_service.dart';
 
+class AccountBlockedException implements Exception {
+  final String message;
+  const AccountBlockedException([this.message = 'Your Account Has Been Blocked']);
+
+  @override
+  String toString() => message;
+}
+
 class AuthProvider extends ChangeNotifier {
   User? _user;
   String? _token;
@@ -236,11 +244,64 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> loadProfile() async {
-    final response = await ApiService.get('/profile');
-    final data = response['data'] ?? response;
-    _user = User.fromJson(data['user'] ?? data);
-    _registerPushToken();
-    notifyListeners();
+    try {
+      final response = await ApiService.get('/profile');
+      final data = response['data'] ?? response;
+      final user = User.fromJson(data['user'] ?? data);
+      if (!user.isActive) {
+        await logout();
+        throw const AccountBlockedException('Your Account Has Been Blocked');
+      }
+      _user = user;
+      _registerPushToken();
+      notifyListeners();
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 || e.message.toLowerCase().contains('blocked')) {
+        await logout();
+        throw AccountBlockedException(
+          e.message.isNotEmpty ? e.message : 'Your Account Has Been Blocked',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// Validates whether the currently stored session is valid and active.
+  /// If the account is blocked or inactive, logs out and throws [AccountBlockedException].
+  Future<User?> checkAccountStatus() async {
+    if (_token == null) {
+      await ApiService.loadToken();
+      _token = ApiService.token;
+    }
+    if (_token == null) return null;
+
+    try {
+      final response = await ApiService.get('/profile');
+      final data = response['data'] ?? response;
+      final user = User.fromJson(data['user'] ?? data);
+
+      if (!user.isActive) {
+        await logout();
+        throw const AccountBlockedException('Your Account Has Been Blocked');
+      }
+
+      _user = user;
+      _registerPushToken();
+      notifyListeners();
+      return user;
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 || e.message.toLowerCase().contains('blocked')) {
+        await logout();
+        throw AccountBlockedException(
+          e.message.isNotEmpty ? e.message : 'Your Account Has Been Blocked',
+        );
+      }
+      if (e.statusCode == 401) {
+        await logout();
+        return null;
+      }
+      rethrow;
+    }
   }
 
   /// Registers the FCM token (and watcher) for the logged-in user, then

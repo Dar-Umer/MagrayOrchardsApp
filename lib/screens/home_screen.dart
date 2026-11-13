@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -234,7 +235,20 @@ class _HomeScreenState extends State<HomeScreen> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1200),
-            child: _buildHomeBody(context, scheme, cartCount),
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: scheme.brightness == Brightness.dark
+                    ? Brightness.light
+                    : Brightness.dark,
+                statusBarBrightness: scheme.brightness,
+              ),
+              child: SafeArea(
+                top: true,
+                bottom: false,
+                child: _buildHomeBody(context, scheme, cartCount),
+              ),
+            ),
           ),
         ),
     };
@@ -459,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       color: primary,
       padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 10,
+        top: MediaQuery.paddingOf(context).top + 12,
         left: 18,
         right: 12,
         bottom: 16,
@@ -888,7 +902,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBrandRail(BuildContext context) {
     final pp = context.watch<ProductProvider>();
-    if (pp.brands.isEmpty) return const SizedBox.shrink();
+    if (pp.brands.isEmpty) {
+      if (pp.brandsLoading) {
+        return const ShimmerBrandRail();
+      }
+      return const SizedBox.shrink();
+    }
     final primary = Theme.of(context).colorScheme.primary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1209,7 +1228,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildReferenceBanners(BuildContext context) {
     final pp = context.watch<ProductProvider>();
-    if (pp.banners.isEmpty) return const SizedBox(height: 8);
+    if (pp.banners.isEmpty) {
+      if (pp.bannersLoading) {
+        return const ShimmerBannerCarousel();
+      }
+      return const SizedBox(height: 8);
+    }
     final primary = Theme.of(context).colorScheme.primary;
     return Container(
       color: primary,
@@ -1276,7 +1300,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategoriesRail(BuildContext context) {
     final pp = context.watch<ProductProvider>();
-    if (pp.categories.isEmpty) return const SizedBox.shrink();
+    if (pp.categories.isEmpty) {
+      if (pp.categoriesLoading) {
+        return const ShimmerCategoriesRail();
+      }
+      return const SizedBox.shrink();
+    }
     final primary = Theme.of(context).colorScheme.primary;
     return Container(
       color: Colors.white,
@@ -1410,21 +1439,17 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<Product> products,
     required bool loading,
   }) {
-    if (!loading && products.isEmpty)
+    if (!loading && products.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
-    if (loading && products.isEmpty)
+    }
+    if (loading && products.isEmpty) {
       return SliverToBoxAdapter(
-        child: SizedBox(
-          height: 230,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: 3,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, __) => SizedBox(width: 158, child: _shimmerCard()),
-          ),
+        child: ShimmerProductSection(
+          title: title,
+          layout: section.layout ?? 'carousel',
         ),
       );
+    }
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
@@ -1564,9 +1589,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildServicesSection(BuildContext context) {
-    final services = context.watch<ProductProvider>().services;
-    if (services.isEmpty)
+    final pp = context.watch<ProductProvider>();
+    final services = pp.services;
+    if (services.isEmpty) {
+      if (pp.servicesLoading) {
+        return const SliverToBoxAdapter(child: ShimmerServicesRail());
+      }
       return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
     final primary = Theme.of(context).colorScheme.primary;
     return SliverToBoxAdapter(
       child: Column(
@@ -1596,7 +1626,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   child: Container(
-                    width: 190,
+                    width: 205,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: primary.withValues(alpha: .08),
@@ -1624,14 +1654,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            service.name,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                service.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                service.formattedPrice,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

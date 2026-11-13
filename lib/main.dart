@@ -30,11 +30,15 @@ import 'screens/subscription_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final themeProvider = ThemeProvider();
+  try {
+    await themeProvider.init();
+  } catch (_) {}
   await ShopConfig.load();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await PushService.instance.initialize();
   await PushService.instance.requestPermission();
-  runApp(const MagrayOrchardsApp());
+  runApp(MagrayOrchardsApp(themeProvider: themeProvider));
   setupPushListeners();
 }
 
@@ -109,13 +113,18 @@ void _handlePushNavigation(RemoteMessage message) {
 }
 
 class MagrayOrchardsApp extends StatelessWidget {
-  const MagrayOrchardsApp({super.key});
+  final ThemeProvider? themeProvider;
+
+  const MagrayOrchardsApp({super.key, this.themeProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        if (themeProvider != null)
+          ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider!)
+        else
+          ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),

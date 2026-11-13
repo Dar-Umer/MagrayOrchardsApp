@@ -165,11 +165,29 @@ class ShopConfig {
     return fallback;
   }
 
-  static Future<void> load() async {
+  @visibleForTesting
+  static Future<bool> Function()? mockLoaderForTesting;
+
+  static Future<bool> load({bool rethrowErrors = false}) async {
+    if (mockLoaderForTesting != null) {
+      try {
+        final ok = await mockLoaderForTesting!();
+        if (!ok && rethrowErrors) {
+          throw ApiException(
+            statusCode: 0,
+            message: 'Unable to connect to Magray Orchards servers. Please check your connection.',
+          );
+        }
+        return ok;
+      } catch (e) {
+        if (rethrowErrors) rethrow;
+        return false;
+      }
+    }
     try {
       final response = await ApiService.get('/config');
       final data = response['data'] ?? response;
-      if (data is! Map) return;
+      if (data is! Map) return false;
 
       _siteName = _strNonEmpty(data['site_name'], _siteName);
       _logoUrl = _str(data['logo_url']);
@@ -223,9 +241,25 @@ class ShopConfig {
 
       // Notify listeners (home screen, checkout, etc.) that config changed.
       revision.value++;
+      return true;
     } catch (e) {
       debugPrint('ShopConfig.load failed: $e');
+      if (rethrowErrors) rethrow;
+      return false;
     }
+  }
+
+  @visibleForTesting
+  static void setMaintenanceForTesting(bool enabled, [String message = '', String until = '']) {
+    _maintenanceEnabled = enabled;
+    if (message.isNotEmpty) _maintenanceMessage = message;
+    if (until.isNotEmpty) _maintenanceUntil = until;
+  }
+
+  @visibleForTesting
+  static void setMinVersionForTesting(String version) {
+    _androidMinVersion = version;
+    _iosMinVersion = version;
   }
 
   static Color? _parseHexColor(String hex) {

@@ -24,6 +24,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   String? _selectedTimeSlot;
   final _orchardDetailsController = TextEditingController();
   final _addressController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
+  int _quantity = 1;
 
   Map<String, Map<String, dynamic>> _availability = {};
   bool _loadingAvailability = true;
@@ -35,6 +37,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   Map<String, dynamic>? _quote;
 
   bool _isBooking = false;
+  String _paymentMethod = 'visit'; // 'visit' = Pay on Visit, 'online' = Pay Online Now
+
+  static double _asDouble(dynamic value, [double fallback = 0.0]) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
 
   static const Map<String, String> _timeSlotLabels = {
     'morning': 'Morning (8 AM - 12 PM)',
@@ -45,19 +55,51 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _quantity = widget.service.minQty;
+    _quantityController.text = _quantity.toString();
     _loadAvailability();
+    if (widget.service.isZeroTravel || widget.service.isFlatTravel) {
+      _fetchQuote();
+    }
   }
 
   @override
   void dispose() {
     _orchardDetailsController.dispose();
     _addressController.dispose();
+    _quantityController.dispose();
     super.dispose();
+  }
+
+  void _updateQuantity(int newQty) {
+    final min = widget.service.minQty;
+    final max = widget.service.maxQty ?? 999999;
+    final sanitized = newQty.clamp(min, max);
+    if (_quantity != sanitized) {
+      setState(() {
+        _quantity = sanitized;
+        _quantityController.text = sanitized.toString();
+      });
+      _fetchQuote();
+    }
+  }
+
+  void _onQuantityTextChanged(String value) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed != null && parsed > 0 && parsed != _quantity) {
+      setState(() {
+        _quantity = parsed;
+      });
+      _fetchQuote();
+    }
   }
 
   Future<void> _loadAvailability() async {
     try {
-      final map = await ApiService.fetchAvailabilityRange();
+      final map = await ApiService.fetchAvailabilityRange(
+        serviceId: widget.service.id,
+        serviceSlug: widget.service.slug,
+      );
       if (mounted) {
         setState(() => _availability = map);
       }
@@ -192,9 +234,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   Future<void> _fetchQuote() async {
-    if (!widget.service.isTravel ||
-        _latitude == null ||
-        _longitude == null) {
+    final isPerKm = widget.service.isPerKmTravel;
+    if (isPerKm && (_latitude == null || _longitude == null)) {
       return;
     }
     setState(() => _fetchingQuote = true);
@@ -203,6 +244,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         widget.service.slug,
         latitude: _latitude,
         longitude: _longitude,
+        quantity: _quantity,
       );
       if (mounted && data['quote'] is Map) {
         setState(() =>
@@ -221,10 +263,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   double get _totalAmount {
-    if (widget.service.isTravel && _quote != null) {
-      return (_quote!['total_amount'] as num).toDouble();
+    if (_quote != null) {
+      return _asDouble(_quote!['total_amount']);
     }
-    return widget.service.basePrice;
+    final base = widget.service.basePrice * _quantity;
+    if (widget.service.isFlatTravel) {
+      final flat = widget.service.flatTravelCharge ?? 100.0;
+      return base + flat;
+    }
+    return base;
   }
 
   void _toast(String message, {Color? color}) {
@@ -237,10 +284,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   void _showPaymentPending(int bookingId, double amount) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
-          'Booking created, but payment is incomplete (${formatCurrency(amount)}). You can pay from My Bookings.'),
-      backgroundColor: Colors.orange,
+          'Booking #$bookingId reserved! Online payment is pending (${formatCurrency(amount)}). You can pay on visit or retry from My Bookings.'),
+      backgroundColor: Colors.orange.shade800,
+      duration: const Duration(seconds: 5),
       action: SnackBarAction(
         label: 'VIEW',
+        textColor: Colors.white,
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
@@ -272,6 +321,24 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       return;
     }
 
+    final service = widget.service;
+    if (service.isQuantityOrAreaBased) {
+      if (_quantity < service.minQty) {
+        _toast(
+          'Minimum ${service.quantityFieldLabel.toLowerCase()} is ${service.minQty} ${service.quantityUnitNoun}.',
+          color: Colors.orange,
+        );
+        return;
+      }
+      if (service.maxQty != null && _quantity > service.maxQty!) {
+        _toast(
+          'Maximum ${service.quantityFieldLabel.toLowerCase()} is ${service.maxQty} ${service.quantityUnitNoun}.',
+          color: Colors.orange,
+        );
+        return;
+      }
+    }
+
     setState(() => _isBooking = true);
 
     try {
@@ -286,39 +353,75 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             ? null
             : _addressController.text.trim(),
         notes: details.isEmpty ? null : details,
-      );
-      final bookingId = booking['id'] as int;
-      final amount = (booking['total_amount'] as num).toDouble();
-      if (!mounted) return;
-      setState(() => _isBooking = false);
-
-      final result = await BookingPayment.start(
-        bookingId: bookingId,
-        description: '${widget.service.name} booking',
-        customerName: auth.user?.name,
-        customerEmail: auth.user?.email,
-        customerPhone: auth.user?.phone,
+        quantity: _quantity,
+        paymentMethod: _paymentMethod,
       );
 
+      final bookingId = int.tryParse(booking['id']?.toString() ?? '') ?? 0;
+      final amount = _asDouble(booking['total_amount'], _totalAmount);
+
       if (!mounted) return;
-      switch (result) {
-        case BookingPaymentResult.success:
-          _toast(
-            'Booking confirmed! Payment of ${formatCurrency(amount)} received.',
-          );
-          Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const MyBookingsScreen()));
-        case BookingPaymentResult.cancelled:
-          _showPaymentPending(bookingId, amount);
-        case BookingPaymentResult.failed:
-          _showPaymentPending(bookingId, amount);
+
+      if (_paymentMethod == 'visit') {
+        setState(() => _isBooking = false);
+        _toast(
+          'Booking confirmed (#$bookingId)! Pay ${formatCurrency(amount)} upon orchard visit.',
+          color: Colors.green,
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+        );
+        return;
+      }
+
+      // Online payment via Razorpay
+      try {
+        final result = await BookingPayment.start(
+          bookingId: bookingId,
+          description: '${widget.service.name} booking',
+          customerName: auth.user?.name,
+          customerEmail: auth.user?.email,
+          customerPhone: auth.user?.phone,
+        );
+
+        if (!mounted) return;
+        setState(() => _isBooking = false);
+
+        switch (result) {
+          case BookingPaymentResult.success:
+            _toast(
+              'Booking confirmed! Payment of ${formatCurrency(amount)} received.',
+              color: Colors.green,
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+            );
+          case BookingPaymentResult.cancelled:
+          case BookingPaymentResult.failed:
+            _showPaymentPending(bookingId, amount);
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+            );
+        }
+      } catch (payError) {
+        if (!mounted) return;
+        setState(() => _isBooking = false);
+        // Booking record was already preserved in DB
+        _showPaymentPending(bookingId, amount);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+        );
       }
     } catch (e) {
       if (mounted) {
         _toast(
           e is ApiException
               ? e.message
-              : 'We couldn\'t complete your booking. Please try again.',
+              : 'Could not create booking. Please check your network and try again.',
           color: Colors.red,
         );
       }
@@ -374,13 +477,35 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 Text(
                     formatCurrency(service.basePrice),
                     style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: cs.primary)),
-                if (service.priceUnit != null) ...[
+                if (service.unitSuffix.isNotEmpty) ...[
                   const SizedBox(width: 4),
-                  Text('/ ${service.priceUnit}',
-                      style: const TextStyle(color: Colors.grey)),
+                  Text(service.unitSuffix,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700)),
+                ],
+                if (service.unitDisplay.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      service.unitDisplay,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -407,13 +532,23 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.local_shipping,
-                      size: 16, color: Colors.grey),
+                  Icon(
+                    service.isZeroTravel
+                        ? Icons.check_circle_outline
+                        : Icons.local_shipping,
+                    size: 16,
+                    color: service.isZeroTravel ? Colors.green : Colors.grey,
+                  ),
                   const SizedBox(width: 4),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                        'Travel charges apply based on the distance from our base location.',
-                        style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      service.travelChargeDescription,
+                      style: TextStyle(
+                        color: service.isZeroTravel ? Colors.green.shade800 : Colors.grey[700],
+                        fontSize: 13,
+                        fontWeight: service.isZeroTravel ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -468,6 +603,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         setState(() => _selectedTimeSlot = value);
                       },
                     ),
+                    if (service.isQuantityOrAreaBased) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      _buildQuantitySection(cs),
+                    ],
                     if (service.isTravel) ...[
                       const SizedBox(height: 16),
                       const Divider(),
@@ -478,7 +619,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       controller: _orchardDetailsController,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        labelText: 'Orchard Details',
+                        labelText: 'Orchard Details & Notes',
                         hintText:
                             'Describe your orchard location and requirements...',
                         border: OutlineInputBorder(
@@ -489,10 +630,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 ),
               ),
             ),
-            if (service.isTravel) ...[
-              const SizedBox(height: 16),
-              _buildQuoteCard(cs),
-            ],
+            const SizedBox(height: 16),
+            _buildQuoteCard(cs),
+            const SizedBox(height: 16),
+            _buildPaymentMethodSection(cs),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -512,7 +653,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             color: Colors.white, strokeWidth: 2.5),
                       )
                     : Text(
-                        'Book & Pay — ${formatCurrency(_totalAmount)}',
+                        _paymentMethod == 'visit'
+                            ? 'Confirm Booking — ${formatCurrency(_totalAmount)}'
+                            : 'Pay Online — ${formatCurrency(_totalAmount)}',
                         style:
                             const TextStyle(fontSize: 16, color: Colors.white)),
               ),
@@ -609,6 +752,155 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
+  Widget _buildQuantitySection(ColorScheme cs) {
+    final service = widget.service;
+    final basePresets = service.isPerTree
+        ? [10, 25, 50, 100, 200, 500]
+        : service.isPerKanal
+            ? [2, 4, 8, 12, 16, 24, 40]
+            : service.isPerAcre
+                ? [1, 2, 5, 10]
+                : [1, 2, 3, 5];
+
+    final validPresets = <int>{service.minQty};
+    for (final p in basePresets) {
+      if (p >= service.minQty &&
+          (service.maxQty == null || p <= service.maxQty!)) {
+        validPresets.add(p);
+      }
+    }
+    if (service.maxQty != null && service.maxQty! <= 500) {
+      validPresets.add(service.maxQty!);
+    }
+    final presets = validPresets.toList()..sort();
+
+    final canDecrease = _quantity > service.minQty;
+    final canIncrease =
+        service.maxQty == null || _quantity < service.maxQty!;
+    final step = service.isPerTree ? 5 : 1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              service.quantityFieldLabel,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            if (service.isPerKanal)
+              Text(
+                '1 Acre = 8 Kanals',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+          ],
+        ),
+        if (service.hasLimit) ...[
+          const SizedBox(height: 3),
+          Row(
+            children: [
+              Icon(Icons.tune_rounded, size: 13, color: cs.primary),
+              const SizedBox(width: 4),
+              Text(
+                'Booking Limit: ${service.limitsDisplay}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: cs.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              color: canDecrease ? cs.primary : Colors.grey.shade400,
+              onPressed: canDecrease
+                  ? () => _updateQuantity(
+                      (_quantity - step) < service.minQty
+                          ? service.minQty
+                          : _quantity - step)
+                  : null,
+            ),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _quantityController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onChanged: _onQuantityTextChanged,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              color: canIncrease ? cs.primary : Colors.grey.shade400,
+              onPressed: canIncrease
+                  ? () => _updateQuantity(
+                      service.maxQty != null && (_quantity + step) > service.maxQty!
+                          ? service.maxQty!
+                          : _quantity + step)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$_quantity ${service.quantityUnitNoun} × ${formatCurrency(service.basePrice)} = ${formatCurrency(_quantity * service.basePrice)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: cs.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: presets.map((preset) {
+            final isSelected = _quantity == preset;
+            return ChoiceChip(
+              label: Text(
+                service.isPerKanal
+                    ? (preset == 8 ? '8 Kanals (1 Acre)' : '$preset Kanals')
+                    : service.isPerTree
+                        ? '$preset Trees'
+                        : service.isPerAcre
+                            ? '$preset Acres'
+                            : '$preset',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.white : Colors.black87,
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: cs.primary,
+              backgroundColor: cs.primary.withValues(alpha: 0.08),
+              onSelected: (_) => _updateQuantity(preset),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildQuoteCard(ColorScheme cs) {
     if (_fetchingQuote) {
       return Card(
@@ -629,33 +921,26 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       );
     }
 
-    if (_quote == null) {
-      return Card(
-        color: cs.primary.withValues(alpha: 0.04),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: const Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.grey),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Set your farm location above to see the travel charge and total price.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final hasTravel = widget.service.isTravel;
+    final hasQuote = _quote != null;
 
-    final base = (_quote!['base_charge'] as num).toDouble();
-    final travel = (_quote!['travel_charge'] as num).toDouble();
-    final total = (_quote!['total_amount'] as num).toDouble();
-    final distance = (_quote!['distance_km'] as num).toDouble();
-    final estimated = _quote!['estimated'] == true;
+    final base = hasTravel && hasQuote
+        ? _asDouble(_quote!['base_charge'], widget.service.basePrice * _quantity)
+        : widget.service.basePrice * _quantity;
+    final travel = hasTravel && hasQuote
+        ? _asDouble(_quote!['travel_charge'], 0.0)
+        : 0.0;
+    final total = hasTravel && hasQuote
+        ? _asDouble(_quote!['total_amount'], base)
+        : base;
+    final distance = hasTravel && hasQuote
+        ? _asDouble(_quote!['distance_km'], 0.0)
+        : 0.0;
+    final estimated = hasTravel && hasQuote && _quote!['estimated'] == true;
+
+    final serviceLabel = widget.service.isQuantityOrAreaBased
+        ? 'Service fee ($_quantity ${widget.service.quantityUnitNoun} @ ${formatCurrency(widget.service.basePrice)})'
+        : 'Service fee';
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -664,21 +949,42 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Price Estimate',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _quoteRow('Base charge', formatCurrency(base)),
-            _quoteRow(
-              'Travel (${distance.toStringAsFixed(1)} km)',
-              formatCurrency(travel),
-            ),
+            const Text('Price Summary',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 10),
+            _quoteRow(serviceLabel, formatCurrency(base)),
+            if (widget.service.isZeroTravel)
+              _quoteRow('Travel Charge', 'Free (Included)'),
+            if (widget.service.isFlatTravel)
+              _quoteRow('Travel Charge (Flat)', formatCurrency(travel > 0 ? travel : (widget.service.flatTravelCharge ?? 100.0))),
+            if (widget.service.isPerKmTravel && hasQuote && travel > 0)
+              _quoteRow(
+                'Travel (${distance.toStringAsFixed(1)} km)',
+                formatCurrency(travel),
+              ),
+            if (widget.service.isPerKmTravel && !hasQuote) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Distance-based travel charges will be calculated after setting your farm location above.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const Divider(height: 20),
-            _quoteRow('Total', formatCurrency(total),
+            _quoteRow(widget.service.isPerKmTravel && !hasQuote ? 'Subtotal (excl. travel)' : 'Total Amount',
+                formatCurrency(total),
                 bold: true, highlighted: true),
             if (estimated) ...[
               const SizedBox(height: 6),
               const Text(
-                'Distance is an estimate and the final charge may vary slightly.',
+                'Distance is an estimate and the final travel charge may vary slightly.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
@@ -710,6 +1016,157 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ? Theme.of(context).colorScheme.primary
                       : Colors.grey[800])),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodSection(ColorScheme cs) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Payment Method',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => setState(() => _paymentMethod = 'visit'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _paymentMethod == 'visit'
+                        ? cs.primary
+                        : Colors.grey.shade300,
+                    width: _paymentMethod == 'visit' ? 2 : 1,
+                  ),
+                  color: _paymentMethod == 'visit'
+                      ? cs.primary.withValues(alpha: 0.05)
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _paymentMethod == 'visit'
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                      color:
+                          _paymentMethod == 'visit' ? cs.primary : Colors.grey,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Pay on Visit (Cash / UPI)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border:
+                                      Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Text(
+                                  'Recommended',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Inspect the work at your orchard first, then pay in cash or UPI.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () => setState(() => _paymentMethod = 'online'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _paymentMethod == 'online'
+                        ? cs.primary
+                        : Colors.grey.shade300,
+                    width: _paymentMethod == 'online' ? 2 : 1,
+                  ),
+                  color: _paymentMethod == 'online'
+                      ? cs.primary.withValues(alpha: 0.05)
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _paymentMethod == 'online'
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                      color:
+                          _paymentMethod == 'online' ? cs.primary : Colors.grey,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Pay Online Now',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Instant confirmation via UPI, Credit/Debit Card or NetBanking.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

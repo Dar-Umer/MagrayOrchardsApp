@@ -4,7 +4,7 @@ import '../config/theme_config.dart';
 import '../services/api_service.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  String _paletteName = 'emerald';
+  String _paletteName = 'rose';
   String _fontFamily = 'Inter';
   bool _isLoading = false;
 
@@ -20,12 +20,16 @@ class ThemeProvider extends ChangeNotifier {
   Map<int, Color> get paletteColors => ThemeConfig.getPaletteColors(_paletteName);
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _paletteName = prefs.getString('theme_palette') ?? 'emerald';
-    _fontFamily = prefs.getString('theme_font') ?? 'Inter';
-    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _paletteName = prefs.getString('theme_palette') ?? 'rose';
+      _fontFamily = prefs.getString('theme_font') ?? 'Inter';
+      notifyListeners();
+    } catch (_) {}
 
-    _fetchFromServer();
+    try {
+      await _fetchFromServer().timeout(const Duration(seconds: 2));
+    } catch (_) {}
   }
 
   Future<void> refresh() => _fetchFromServer();

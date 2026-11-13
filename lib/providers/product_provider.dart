@@ -22,6 +22,11 @@ class ProductProvider extends ChangeNotifier {
   int _currentPage = 1;
   bool _hasMore = true;
 
+  bool _bannersLoading = false;
+  bool _categoriesLoading = false;
+  bool _brandsLoading = false;
+  bool _servicesLoading = false;
+
   bool _featuredLoading = false;
   bool _offerLoading = false;
   bool _categoryLoading = false;
@@ -52,6 +57,10 @@ class ProductProvider extends ChangeNotifier {
   List<ServiceModel> get services => _services;
   List<AppBanner> get banners => _banners;
   bool get isLoading => _isLoading;
+  bool get bannersLoading => _bannersLoading;
+  bool get categoriesLoading => _categoriesLoading;
+  bool get brandsLoading => _brandsLoading;
+  bool get servicesLoading => _servicesLoading;
   bool get featuredLoading => _featuredLoading;
   bool get offerLoading => _offerLoading;
   bool get categoryLoading => _categoryLoading;
@@ -343,6 +352,8 @@ class ProductProvider extends ChangeNotifier {
   }
 
   Future<void> fetchCategories() async {
+    _categoriesLoading = true;
+    notifyListeners();
     try {
       final response = await ApiService.get('/categories');
       final data = response['data'];
@@ -353,28 +364,34 @@ class ProductProvider extends ChangeNotifier {
         items = [];
       }
       _categories = items.map((c) => Category.fromJson(c)).toList();
-      notifyListeners();
     } catch (e) {
       debugPrint('ProductProvider.fetchCategories error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load categories.';
+    } finally {
+      _categoriesLoading = false;
+      notifyListeners();
     }
   }
 
   Future<void> fetchBrands() async {
+    _brandsLoading = true;
+    notifyListeners();
     try {
       final items = await ApiService.fetchBrands();
       _brands = items
           .map((b) => Brand.fromJson(b as Map<String, dynamic>))
           .toList();
-      notifyListeners();
     } catch (e) {
       debugPrint('ProductProvider.fetchBrands error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load brands.';
+    } finally {
+      _brandsLoading = false;
+      notifyListeners();
     }
   }
 
   Future<void> fetchServices() async {
-    _isLoading = true;
+    _servicesLoading = true;
     notifyListeners();
     try {
       final response = await ApiService.get('/services');
@@ -391,21 +408,26 @@ class ProductProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('ProductProvider.fetchServices error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load services.';
+    } finally {
+      _servicesLoading = false;
+      notifyListeners();
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> fetchBanners() async {
+    _bannersLoading = true;
+    notifyListeners();
     try {
       final response = await ApiService.get('/banners');
       final data = response['data'];
       if (data is List) {
         _banners = data.map((b) => AppBanner.fromJson(b)).toList();
-        notifyListeners();
       }
     } catch (e) {
       _errorMessage = e is ApiException ? e.message : 'Could not load banners.';
+    } finally {
+      _bannersLoading = false;
+      notifyListeners();
     }
   }
 }

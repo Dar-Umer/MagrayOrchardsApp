@@ -52,3 +52,57 @@ String formatDateTime(dynamic raw) {
   }
   return str.split('T').first;
 }
+
+/// Formats a service price unit for display (e.g. 'per_tree' -> 'Per Tree', 'per_kanal' -> 'Per Kanal').
+String formatPriceUnit(String? unit) {
+  if (unit == null || unit.trim().isEmpty) return '';
+  final normalized = unit.trim().toLowerCase();
+  switch (normalized) {
+    case 'per_tree':
+    case 'tree':
+    case 'per tree':
+      return 'Per Tree';
+    case 'per_kanal':
+    case 'kanal':
+    case 'per kanal':
+      return 'Per Kanal';
+    case 'per_acre':
+    case 'acre':
+    case 'per acre':
+      return 'Per Acre';
+    case 'per_visit':
+    case 'visit':
+    case 'per visit':
+      return 'Per Visit';
+    case 'fixed':
+      return 'Fixed';
+    case 'per_hour':
+    case 'hour':
+    case 'per hour':
+      return 'Per Hour';
+    case 'per_day':
+    case 'day':
+    case 'per day':
+      return 'Per Day';
+    default:
+      final words = unit.replaceAll('_', ' ').trim().split(RegExp(r'\s+'));
+      return words
+          .map((w) => w.isNotEmpty
+              ? '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}'
+              : '')
+          .join(' ');
+  }
+}
+
+/// Returns a clean suffix like `/ Tree` or `/ Kanal` or `/ Visit`.
+String formatPriceUnitSuffix(String? unit) {
+  final formatted = formatPriceUnit(unit);
+  if (formatted.isEmpty) return '';
+  if (formatted.toLowerCase().startsWith('per ')) {
+    return '/ ${formatted.substring(4)}';
+  }
+  if (formatted.toLowerCase() == 'fixed') {
+    return '(Fixed)';
+  }
+  return '/ $formatted';
+}
