@@ -12,23 +12,21 @@ class ApiConfig {
   static const String _imageBaseUrlOverride = String.fromEnvironment('API_IMAGE_BASE_URL');
 
   static const String _defaultBaseUrl = 'https://magrayorchards.com/api';
-  static const String _defaultImageBaseUrl = 'https://magrayorchards.com/api/images/';
 
   static String get baseUrl {
     if (_baseUrlOverride.isNotEmpty) {
-      return _stripTrailingSlash(_baseUrlOverride);
+      final stripped = _stripTrailingSlash(_baseUrlOverride);
+      return stripped.endsWith('/api') ? stripped : '$stripped/api';
     }
     return _defaultBaseUrl;
   }
 
   static String get imageBaseUrl {
     if (_imageBaseUrlOverride.isNotEmpty) {
-      return _stripTrailingSlash(_imageBaseUrlOverride);
+      final stripped = _stripTrailingSlash(_imageBaseUrlOverride);
+      return stripped.endsWith('/') ? stripped : '$stripped/';
     }
-    if (_baseUrlOverride.isNotEmpty) {
-      return '${_stripTrailingSlash(_baseUrlOverride)}/images/';
-    }
-    return _defaultImageBaseUrl;
+    return '$baseUrl/images/';
   }
 
   static String _stripTrailingSlash(String url) => url.endsWith('/') ? url.substring(0, url.length - 1) : url;
