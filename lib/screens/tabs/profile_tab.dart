@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/wallet_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/pro_member_badge.dart';
 import '../address_screen.dart';
-import '../change_password_screen.dart';
 import '../edit_profile_screen.dart';
 import '../login_screen.dart';
 import '../my_bookings_screen.dart';
@@ -155,19 +157,6 @@ class ProfileTab extends StatelessWidget {
                       ),
                       const Divider(indent: 52),
                       ListTile(
-                        leading: Icon(Icons.lock_reset, color: primary),
-                        title: const Text('Reset Password'),
-                        subtitle: const Text('Change password or recover via OTP'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePasswordScreen(),
-                          ),
-                        ),
-                      ),
-                      const Divider(indent: 52),
-                      ListTile(
                         leading: Icon(Icons.workspace_premium, color: primary),
                         title: const Text('My Subscription'),
                         trailing: const Icon(Icons.chevron_right),
@@ -257,7 +246,17 @@ class ProfileTab extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => auth.logout(),
+                    onPressed: () async {
+                      if (context.mounted) {
+                        context.read<AddressProvider>().reset();
+                        context.read<OrderProvider>().reset();
+                        context.read<WalletProvider>().reset();
+                      }
+                      await auth.logout();
+                      if (context.mounted) {
+                        Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
+                      }
+                    },
                     icon: const Icon(Icons.logout, color: Colors.red),
                     label:
                         const Text('Logout', style: TextStyle(color: Colors.red)),

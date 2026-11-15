@@ -53,6 +53,8 @@ String formatDateTime(dynamic raw) {
   return str.split('T').first;
 }
 
+final _whitespaceRegex = RegExp(r'\s+');
+
 /// Formats a service price unit for display (e.g. 'per_tree' -> 'Per Tree', 'per_kanal' -> 'Per Kanal').
 String formatPriceUnit(String? unit) {
   if (unit == null || unit.trim().isEmpty) return '';
@@ -85,7 +87,7 @@ String formatPriceUnit(String? unit) {
     case 'per day':
       return 'Per Day';
     default:
-      final words = unit.replaceAll('_', ' ').trim().split(RegExp(r'\s+'));
+      final words = unit.replaceAll('_', ' ').trim().split(_whitespaceRegex);
       return words
           .map((w) => w.isNotEmpty
               ? '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}'

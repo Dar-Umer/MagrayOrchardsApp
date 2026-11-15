@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_network_image.dart';
+import '../widgets/app_loading_indicator.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_box.dart';
 import '../providers/auth_provider.dart';
@@ -15,12 +17,14 @@ import '../providers/address_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/wishlist_provider.dart';
+import '../providers/personalization_provider.dart';
 import '../config/api_config.dart';
 import '../models/product.dart';
 import '../models/home_section.dart';
 import '../services/shop_config.dart';
 import '../utils/app_navigation.dart';
 import 'login_screen.dart';
+import 'phone_input_screen.dart';
 import 'product_detail_screen.dart';
 import 'service_detail_screen.dart';
 import 'category_products_screen.dart';
@@ -44,6 +48,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  // ── Infinite scroll & controller ──
+  final ScrollController _scrollController = ScrollController();
+
   // ── Inline search state ──
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -54,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     AppNavigation.requestedTab.addListener(_handleExternalTabRequest);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshShopConfig(fetchSections: true);
@@ -66,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<NotificationProvider>().loadUnreadCount();
         context.read<WishlistProvider>().fetchWishlist();
       }
+      context.read<PersonalizationProvider>().fetchPersonalizedFeed();
     });
   }
 
@@ -95,13 +104,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchAllHomeFeeds(ProductProvider pp) async {
     await Future.wait([
       pp.fetchProducts(
-          isFeatured: true, page: 1, perPage: _sourcePerPage('featured')),
+          isFeatured: true, page: 1, perPage: math.max(_sourcePerPage('featured'), 20)),
       pp.fetchProducts(
-          sortBy: 'newest', page: 1, perPage: _sourcePerPage('newest')),
+          sortBy: 'newest', page: 1, perPage: math.max(_sourcePerPage('newest'), 20)),
       pp.fetchCategories(),
       pp.fetchServices(),
       pp.fetchBanners(),
-      pp.fetchOfferProducts(perPage: _sourcePerPage('offers')),
+      pp.fetchOfferProducts(perPage: math.max(_sourcePerPage('offers'), 20)),
       pp.fetchBrands(),
     ]);
   }
@@ -111,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _refreshShopConfig({bool fetchSections = false}) async {
     if (mounted) {
       context.read<ThemeProvider>().refresh();
+      context.read<PersonalizationProvider>().fetchPersonalizedFeed(force: true);
     }
     await ShopConfig.load();
     if (!mounted) return;
@@ -147,11 +157,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     AppNavigation.requestedTab.removeListener(_handleExternalTabRequest);
     _searchDebounce?.cancel();
     _searchController.dispose();
     _speech.stop();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll > 0 && currentScroll >= maxScroll - 350) {
+      final pp = context.read<ProductProvider>();
+      if (!pp.infiniteLoading && pp.infiniteHasMore) {
+        pp.loadMoreInfiniteProducts();
+      }
+    }
   }
 
   void _onSearchChanged(String query) {
@@ -224,7 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final cartCount = context.watch<CartProvider>().itemCount;
 
     final Widget activeBody = switch (_currentIndex) {
       1 => const ReelsScreen(),
@@ -246,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SafeArea(
                 top: true,
                 bottom: false,
-                child: _buildHomeBody(context, scheme, cartCount),
+                child: _buildHomeBody(context, scheme),
               ),
             ),
           ),
@@ -273,17 +296,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   destinations: [
                     NavigationRailDestination(
                       icon: const Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home, color: scheme.primary),
+                      selectedIcon: Icon(Icons.home_rounded, color: scheme.primary),
                       label: const Text('Home'),
                     ),
                     NavigationRailDestination(
-                      icon: const Icon(Icons.slow_motion_video_outlined),
-                      selectedIcon: Icon(Icons.slow_motion_video, color: scheme.primary),
+                      icon: const Icon(Icons.play_circle_outline_rounded),
+                      selectedIcon: Icon(Icons.play_circle_rounded, color: scheme.primary),
                       label: const Text('Reels'),
                     ),
                     NavigationRailDestination(
-                      icon: const Icon(Icons.construction_outlined),
-                      selectedIcon: Icon(Icons.construction, color: scheme.primary),
+                      icon: const ImageIcon(AssetImage('assets/icons/services_quality.png'), size: 24),
+                      selectedIcon: ImageIcon(const AssetImage('assets/icons/services_quality.png'), size: 24, color: scheme.primary),
                       label: const Text('Services'),
                     ),
                     NavigationRailDestination(
@@ -292,8 +315,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: const Text('Cart'),
                     ),
                     NavigationRailDestination(
-                      icon: const Icon(Icons.person_outlined),
-                      selectedIcon: Icon(Icons.person, color: scheme.primary),
+                      icon: const Icon(Icons.person_outline_rounded),
+                      selectedIcon: Icon(Icons.person_rounded, color: scheme.primary),
                       label: const Text('Profile'),
                     ),
                   ],
@@ -313,17 +336,17 @@ class _HomeScreenState extends State<HomeScreen> {
             destinations: [
               NavigationDestination(
                 icon: const Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home, color: scheme.primary),
+                selectedIcon: Icon(Icons.home_rounded, color: scheme.primary),
                 label: 'Home',
               ),
               NavigationDestination(
-                icon: const Icon(Icons.slow_motion_video_outlined),
-                selectedIcon: Icon(Icons.slow_motion_video, color: scheme.primary),
+                icon: const Icon(Icons.play_circle_outline_rounded),
+                selectedIcon: Icon(Icons.play_circle_rounded, color: scheme.primary),
                 label: 'Reels',
               ),
               NavigationDestination(
-                icon: const Icon(Icons.construction_outlined),
-                selectedIcon: Icon(Icons.construction, color: scheme.primary),
+                icon: const ImageIcon(AssetImage('assets/icons/services_quality.png'), size: 24),
+                selectedIcon: ImageIcon(const AssetImage('assets/icons/services_quality.png'), size: 24, color: scheme.primary),
                 label: 'Services',
               ),
               NavigationDestination(
@@ -332,8 +355,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Cart',
               ),
               NavigationDestination(
-                icon: const Icon(Icons.person_outlined),
-                selectedIcon: Icon(Icons.person, color: scheme.primary),
+                icon: const Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded, color: scheme.primary),
                 label: 'Profile',
               ),
             ],
@@ -346,12 +369,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeBody(
     BuildContext context,
     ColorScheme scheme,
-    int cartCount,
   ) {
     return RefreshIndicator(
       color: scheme.primary,
       onRefresh: () async {
         final pp = context.read<ProductProvider>();
+        pp.resetInfiniteProducts();
         await _refreshShopConfig();
         if (!mounted) return;
         await _fetchAllHomeFeeds(pp);
@@ -361,17 +384,19 @@ class _HomeScreenState extends State<HomeScreen> {
         valueListenable: ShopConfig.revision,
         builder: (context, _, _) {
           return CustomScrollView(
+            controller: _scrollController,
             slivers: [
               if (_isSectionEnabled('announcement'))
                 SliverToBoxAdapter(child: _buildAnnouncementBar(context)),
               SliverToBoxAdapter(
-                child: _buildReferenceHeader(context, cartCount),
+                child: _buildReferenceHeader(context),
               ),
               SliverToBoxAdapter(child: _buildSearchBar(context)),
               if (_searchQuery.isNotEmpty)
                 _buildSearchResults(context)
               else ...[
                 ..._buildHomeSections(context),
+                ..._buildInfiniteFeedSlivers(context, scheme),
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
             ],
@@ -382,13 +407,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _cartNavigationIcon(BuildContext context, bool selected) {
-    final count = context.watch<CartProvider>().itemCount;
-    final icon = Icon(
-      selected ? Icons.shopping_cart : Icons.shopping_cart_outlined,
-      color: selected ? Theme.of(context).colorScheme.primary : null,
+    return Selector<CartProvider, int>(
+      selector: (_, cart) => cart.itemCount,
+      builder: (context, count, child) {
+        final icon = Icon(
+          selected ? Icons.shopping_cart_rounded : Icons.shopping_cart_outlined,
+          color: selected ? Theme.of(context).colorScheme.primary : null,
+        );
+        if (count == 0) return icon;
+        return Badge(label: Text('$count'), child: icon);
+      },
     );
-    if (count == 0) return icon;
-    return Badge(label: Text('$count'), child: icon);
   }
 
   Widget _shimmerCard() => const ShimmerProductCard();
@@ -468,12 +497,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildReferenceHeader(BuildContext context, int cartCount) {
+  Widget _buildReferenceHeader(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Container(
       color: primary,
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 12,
+      padding: const EdgeInsets.only(
+        top: 14,
         left: 18,
         right: 12,
         bottom: 16,
@@ -550,45 +579,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               );
             },
-          ),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                tooltip: 'Cart',
-                onPressed: () => setState(() => _currentIndex = 3),
-                icon: const Icon(
-                  Icons.shopping_cart_outlined,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              if (cartCount > 0)
-                Positioned(
-                  right: 2,
-                  top: 0,
-                  child: Container(
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$cartCount',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
           ),
         ],
       ),
@@ -695,17 +685,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _buildHomeSections(BuildContext context) {
     final pp = context.watch<ProductProvider>();
+    final pers = context.watch<PersonalizationProvider>();
     final sections = ShopConfig.homeSections
         .where((s) => s.enabled && s.type != 'announcement')
         .toList();
 
     final slivers = <Widget>[];
+    final displayedProductIds = <int>{};
+
+    final hasExplicitRecentlyViewed = sections.any((s) => s.type == 'recently_viewed');
+    final hasExplicitRecommended = sections.any((s) => s.type == 'recommended');
+    final hasExplicitBuyAgain = sections.any((s) => s.type == 'buy_again');
+    final hasExplicitWishlist = sections.any((s) => s.type == 'wishlist_picks');
+    final hasExplicitSeasonal = sections.any((s) => s.type == 'seasonal_orchard');
 
     for (var i = 0; i < sections.length; i++) {
       final section = sections[i];
       final hasSpacerBefore =
-          (section.type == 'products' || section.type == 'services') &&
-              slivers.isNotEmpty;
+          (section.type == 'products' ||
+           section.type == 'services' ||
+           section.type == 'recently_viewed' ||
+           section.type == 'recommended' ||
+           section.type == 'buy_again' ||
+           section.type == 'wishlist_picks' ||
+           section.type == 'seasonal_orchard') &&
+          slivers.isNotEmpty;
       if (hasSpacerBefore) {
         slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 6)));
       }
@@ -721,6 +725,16 @@ class _HomeScreenState extends State<HomeScreen> {
           break;
         case 'categories':
           slivers.add(SliverToBoxAdapter(child: _buildCategoriesRail(context)));
+          // If recently viewed is not explicitly in layout, seamlessly inject it right after categories
+          if (!hasExplicitRecentlyViewed) {
+            final recViewed = pers.recentlyViewed
+                .where((p) => !displayedProductIds.contains(p.id))
+                .toList();
+            if (recViewed.isNotEmpty) {
+              slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
+              slivers.add(_buildRecentlyViewedSliver(context, pers, null, displayedProductIds));
+            }
+          }
           break;
         case 'brands':
           slivers.add(SliverToBoxAdapter(child: _buildBrandRail(context)));
@@ -737,59 +751,546 @@ class _HomeScreenState extends State<HomeScreen> {
           slivers.add(_buildServicesSection(context));
           break;
         case 'products':
-          slivers.add(_buildConfiguredProductSection(context, pp, section));
+          slivers.add(_buildConfiguredProductSection(context, pp, section, displayedProductIds));
           break;
+        case 'recently_viewed':
+          final recViewed = pers.recentlyViewed
+              .where((p) => !displayedProductIds.contains(p.id))
+              .toList();
+          if (recViewed.isNotEmpty) {
+            slivers.add(_buildRecentlyViewedSliver(context, pers, section, displayedProductIds));
+          }
+          break;
+        case 'recommended':
+          final recs = pers.recommendedProducts
+              .where((p) => !displayedProductIds.contains(p.id))
+              .toList();
+          final recsToDisplay = recs.isNotEmpty ? recs : pers.recommendedProducts;
+          if (recsToDisplay.isNotEmpty) {
+            displayedProductIds.addAll(recsToDisplay.map((p) => p.id));
+            slivers.add(_buildPersonalizedProductSection(
+              context,
+              title: section.title ?? 'Recommended For Your Orchard',
+              products: recsToDisplay,
+              section: section,
+            ));
+          }
+          break;
+        case 'buy_again':
+          final buyAgain = pers.buyAgainProducts
+              .where((p) => !displayedProductIds.contains(p.id))
+              .toList();
+          if (buyAgain.isNotEmpty) {
+            displayedProductIds.addAll(buyAgain.map((p) => p.id));
+            slivers.add(_buildPersonalizedProductSection(
+              context,
+              title: section.title ?? 'Buy It Again',
+              products: buyAgain,
+              section: section,
+            ));
+          }
+          break;
+        case 'wishlist_picks':
+          final wl = pers.wishlistPicks
+              .where((p) => !displayedProductIds.contains(p.id))
+              .toList();
+          if (wl.isNotEmpty) {
+            displayedProductIds.addAll(wl.map((p) => p.id));
+            slivers.add(_buildPersonalizedProductSection(
+              context,
+              title: section.title ?? 'From Your Wishlist & Similar',
+              products: wl,
+              section: section,
+            ));
+          }
+          break;
+        case 'seasonal_orchard':
+          final seasonal = pers.seasonalProducts
+              .where((p) => !displayedProductIds.contains(p.id))
+              .toList();
+          final seasonalToDisplay = seasonal.isNotEmpty ? seasonal : pers.seasonalProducts;
+          if (seasonalToDisplay.isNotEmpty) {
+            displayedProductIds.addAll(seasonalToDisplay.map((p) => p.id));
+            slivers.add(_buildPersonalizedProductSection(
+              context,
+              title: section.title ?? 'Seasonal Kashmiri Orchard Care',
+              products: seasonalToDisplay,
+              section: section,
+            ));
+          }
+          break;
+      }
+    }
+
+    // Auto-inject buy-again, recommended & seasonal if not in explicit layout and items exist
+    if (!hasExplicitBuyAgain) {
+      final buyAgain = pers.buyAgainProducts
+          .where((p) => !displayedProductIds.contains(p.id))
+          .toList();
+      if (buyAgain.isNotEmpty) {
+        displayedProductIds.addAll(buyAgain.map((p) => p.id));
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
+        slivers.add(_buildPersonalizedProductSection(
+          context,
+          title: 'Buy It Again',
+          products: buyAgain,
+        ));
+      }
+    }
+
+    if (!hasExplicitRecommended) {
+      final recs = pers.recommendedProducts
+          .where((p) => !displayedProductIds.contains(p.id))
+          .toList();
+      if (recs.isNotEmpty) {
+        displayedProductIds.addAll(recs.map((p) => p.id));
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
+        slivers.add(_buildPersonalizedProductSection(
+          context,
+          title: 'Recommended For Your Orchard',
+          products: recs,
+        ));
+      }
+    }
+
+    if (!hasExplicitSeasonal) {
+      final seasonal = pers.seasonalProducts
+          .where((p) => !displayedProductIds.contains(p.id))
+          .toList();
+      if (seasonal.isNotEmpty) {
+        displayedProductIds.addAll(seasonal.map((p) => p.id));
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
+        slivers.add(_buildPersonalizedProductSection(
+          context,
+          title: 'Seasonal Kashmiri Orchard Care',
+          products: seasonal,
+        ));
       }
     }
 
     return slivers;
   }
 
+  List<Widget> _buildInfiniteFeedSlivers(BuildContext context, ColorScheme scheme) {
+    final pp = context.watch<ProductProvider>();
+    final slivers = <Widget>[];
+
+    // If infinite feed hasn't been initialized yet and isn't currently loading:
+    if (!pp.infiniteInitialized && !pp.infiniteLoading) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Center(
+              child: TextButton.icon(
+                key: const Key('infinite_scroll_sentinel_btn'),
+                onPressed: () => context.read<ProductProvider>().loadMoreInfiniteProducts(),
+                icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                label: const Text('Scroll to load more products'),
+              ),
+            ),
+          ),
+        ),
+      );
+      return slivers;
+    }
+
+    // Initial loading indicator when user reaches the bottom for the first time
+    if (pp.infiniteProducts.isEmpty && pp.infiniteLoading) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppLoadingIndicator(
+                    size: 24,
+                    strokeWidth: 2.5,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Loading fresh orchard harvest...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return slivers;
+    }
+
+    // If we have loaded infinite products:
+    if (pp.infiniteProducts.isNotEmpty) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.eco_rounded, size: 18, color: scheme.primary),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Explore All Products',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: scheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: scheme.secondaryContainer.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${pp.infiniteProducts.length} items',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: scheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Fresh Kashmiri harvest • Top rated reviews first',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            gridDelegate: responsiveProductGridDelegate(),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final product = pp.infiniteProducts[index];
+                return ProductCard(
+                  product: product,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductDetailScreen(product: product),
+                    ),
+                  ),
+                );
+              },
+              childCount: pp.infiniteProducts.length,
+            ),
+          ),
+        ),
+      );
+
+      if (pp.infiniteLoading) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppLoadingIndicator(
+                      size: 20,
+                      strokeWidth: 2.2,
+                      color: scheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Loading 10 more products...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      if (!pp.infiniteHasMore) {
+        slivers.add(
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer.withValues(alpha: 0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.check_circle_outline_rounded, color: scheme.primary, size: 28),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "You've reached the end of our orchard catalog",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Showing all ${pp.infiniteProducts.length} verified products sorted by rating',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.tonalIcon(
+                    key: const Key('infinite_back_to_top_btn'),
+                    onPressed: () {
+                      _scrollController.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 600),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_upward_rounded, size: 16),
+                    label: const Text('Back to Top'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return slivers;
+  }
+
+  Widget _buildRecentlyViewedSliver(
+    BuildContext context,
+    PersonalizationProvider pers, [
+    HomeSection? section,
+    Set<int>? displayedProductIds,
+  ]) {
+    final title = section?.title ?? 'Recently Viewed';
+    final limit = section?.limit ?? 10;
+    final items = (displayedProductIds != null
+            ? pers.recentlyViewed.where((p) => !displayedProductIds.contains(p.id))
+            : pers.recentlyViewed)
+        .take(limit)
+        .toList();
+    if (items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+    displayedProductIds?.addAll(items.map((p) => p.id));
+
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.history_rounded, size: 20, color: Color(0xFF800020)),
+                    const SizedBox(width: 8),
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () => pers.clearRecentlyViewed(),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: Colors.grey[600],
+                  ),
+                  child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 230,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final product = items[index];
+                return SizedBox(
+                  width: 145,
+                  child: ProductCard(product: product),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalizedProductSection(
+    BuildContext context, {
+    required String title,
+    required List<Product> products,
+    HomeSection? section,
+  }) {
+    final sec = section ?? HomeSection(
+      type: 'products',
+      title: title,
+      layout: 'carousel',
+      rows: 1,
+      limit: 10,
+    );
+
+    final limit = sec.fetchLimit;
+    final items = products.take(limit).toList();
+
+    return _buildProductSection(
+      context,
+      section: sec,
+      title: title,
+      products: items,
+      loading: false,
+    );
+  }
+
   Widget _buildConfiguredProductSection(
-      BuildContext context, ProductProvider pp, HomeSection section) {
+      BuildContext context, ProductProvider pp, HomeSection section,
+      [Set<int>? displayedProductIds]) {
     final String title;
-    final List<Product> products;
+    final List<Product> rawProducts;
     final bool loading;
 
     switch (section.source) {
       case 'offers':
         title = section.title ?? "Today's Offers";
-        products = pp.offerProducts;
+        rawProducts = pp.offerProducts;
         loading = pp.offerLoading;
         break;
       case 'featured':
         title = section.title ?? 'Featured Products';
-        products = pp.featuredProducts;
+        rawProducts = pp.featuredProducts;
         loading = pp.featuredLoading;
         break;
       case 'newest':
         title = section.title ?? 'Newly Added';
-        products = pp.products;
+        rawProducts = pp.products;
         loading = pp.isLoading;
         break;
       case 'category':
         title = section.title ?? 'Products';
         final key = 'category_${section.categoryId}';
-        products = pp.sectionProducts(key);
+        rawProducts = pp.sectionProducts(key);
         loading = pp.isSectionLoading(key);
         break;
       case 'brand':
         title = section.title ?? 'Products';
         final key = 'brand_${section.brandId}';
-        products = pp.sectionProducts(key);
+        rawProducts = pp.sectionProducts(key);
         loading = pp.isSectionLoading(key);
         break;
       default:
         title = section.title ?? 'Products';
-        products = pp.products;
+        rawProducts = pp.products;
         loading = pp.isLoading;
     }
+
+    if (loading && rawProducts.isEmpty) {
+      return _buildProductSection(
+        context,
+        section: section,
+        title: title,
+        products: const [],
+        loading: true,
+      );
+    }
+
+    final uniqueProducts = displayedProductIds != null
+        ? rawProducts.where((p) => !displayedProductIds.contains(p.id)).toList()
+        : rawProducts;
+
+    final List<Product> productsToDisplay;
+    if (uniqueProducts.isNotEmpty) {
+      productsToDisplay = uniqueProducts;
+    } else {
+      // If all candidates were shown in prior sections, still display rawProducts
+      // so the admin's section configured in tab=home NEVER disappears from the screen!
+      productsToDisplay = rawProducts;
+    }
+
+    if (productsToDisplay.isEmpty && !loading) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
+    displayedProductIds?.addAll(productsToDisplay.map((p) => p.id));
 
     return _buildProductSection(
       context,
       section: section,
       title: title,
-      products: products,
+      products: productsToDisplay,
       loading: loading,
     );
   }
@@ -916,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.fromLTRB(18, 20, 18, 4),
           child: Text(
             'Shop by Brand',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, letterSpacing: -0.2),
           ),
         ),
         SizedBox(
@@ -1102,7 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           return const Padding(
                             padding: EdgeInsets.all(24),
                             child: Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: AppLoadingIndicator.medium(),
                             ),
                           );
                         }
@@ -1309,16 +1810,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final primary = Theme.of(context).colorScheme.primary;
     return Container(
       color: Colors.white,
-      height: 190,
-      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      height: 200,
+      padding: const EdgeInsets.only(top: 10, bottom: 4),
       child: GridView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          mainAxisExtent: 90,
-          mainAxisSpacing: 5,
-          crossAxisSpacing: 2,
+          mainAxisExtent: 88,
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 4,
         ),
         itemCount: pp.categories.length,
         itemBuilder: (context, index) {
@@ -1334,14 +1835,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 62,
-                  height: 62,
-                  padding: const EdgeInsets.all(3),
+                  width: 56,
+                  height: 56,
+                  padding: const EdgeInsets.all(2.5),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: primary, width: 2),
+                    border: Border.all(color: primary, width: 1.8),
                   ),
                   child: ClipOval(
                     child: cat.image != null
@@ -1459,11 +1961,13 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Text(
               title,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.w800,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+                height: 1.2,
               ),
             ),
           ),
@@ -1606,7 +2110,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.fromLTRB(18, 22, 18, 10),
             child: Text(
               'Orchard Services',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, letterSpacing: -0.2),
             ),
           ),
           SizedBox(

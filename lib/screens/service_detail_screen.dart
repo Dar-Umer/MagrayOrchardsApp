@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
 import '../utils/formatters.dart';
+import '../widgets/app_network_image.dart';
 import 'login_screen.dart';
 import 'my_bookings_screen.dart';
 
@@ -455,10 +456,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               child: service.image != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        '${ApiConfig.imageBaseUrl}${service.image}',
+                      child: AppNetworkImage(
+                        imageUrl: '${ApiConfig.imageBaseUrl}${service.image}',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Icon(
+                        errorWidget: (context, url, error) => Icon(
                             Icons.construction,
                             size: 80,
                             color: cs.primary),
@@ -693,41 +694,38 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _gettingLocation ? null : _searchAddress,
-                icon: _gettingLocation
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search, size: 18),
-                label: const Text('Search'),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
+            OutlinedButton.icon(
+              onPressed: _gettingLocation ? null : _searchAddress,
+              icon: _gettingLocation
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.search, size: 18),
+              label: const Text('Search'),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _gettingLocation ? null : _useGps,
-                icon: _gettingLocation
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(Icons.my_location, size: 18, color: cs.primary),
-                label: const Text('Use My GPS Location'),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
+            OutlinedButton.icon(
+              onPressed: _gettingLocation ? null : _useGps,
+              icon: _gettingLocation
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.my_location, size: 18, color: cs.primary),
+              label: const Text('Use My GPS'),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],

@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, uri_does_not_exist, deprecated_member_use
 import 'dart:html' as html;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_util' as js_util;
 import 'razorpay_helper.dart';
@@ -68,38 +69,34 @@ class RazorpayPlatformImpl implements RazorpayHelper {
       }),
     );
 
-    // Use JSON to safely encode string values and avoid JS injection via string interpolation.
-    String jsStr(dynamic v) => v?.toString().replaceAll("'", "\\'").replaceAll('\n', '\\n') ?? '';
-    final jsKey = jsStr(opts['key']);
-    final jsAmount = jsStr(opts['amount']);
-    final jsCurrency = jsStr(opts['currency'] ?? 'INR');
-    final jsName = jsStr(opts['name'] ?? 'Magray Orchards');
-    final jsDesc = jsStr(opts['description'] ?? '');
-    final jsOrderId = jsStr(opts['order_id']);
-    final jsPName = jsStr(opts['prefill']?['name'] ?? '');
-    final jsPEmail = jsStr(opts['prefill']?['email'] ?? '');
-    final jsPContact = jsStr(opts['prefill']?['contact'] ?? '');
+    // Safely serialize options using standard JSON encoding to prevent script injection.
+    final payload = jsonEncode({
+      'key': opts['key']?.toString() ?? '',
+      'amount': opts['amount'] ?? 0,
+      'currency': opts['currency']?.toString() ?? 'INR',
+      'name': opts['name']?.toString() ?? 'Magray Orchards',
+      'description': opts['description']?.toString() ?? '',
+      'order_id': opts['order_id']?.toString() ?? '',
+      'prefill': {
+        'name': opts['prefill']?['name']?.toString() ?? '',
+        'email': opts['prefill']?['email']?.toString() ?? '',
+        'contact': opts['prefill']?['contact']?.toString() ?? '',
+      },
+    });
 
     // Inject a <script> element with the Razorpay checkout code.
     final script = html.ScriptElement()
       ..text = '''
 (function() {
   try {
-    var rzp = new Razorpay({
-      key: '$jsKey',
-      amount: '$jsAmount',
-      currency: '$jsCurrency',
-      name: '$jsName',
-      description: '$jsDesc',
-      order_id: '$jsOrderId',
-      prefill: { name: '$jsPName', email: '$jsPEmail', contact: '$jsPContact' },
-      handler: function(r) {
-        window._rzpSuccess(r.razorpay_payment_id, r.razorpay_order_id, r.razorpay_signature);
-      },
-      modal: {
-        ondismiss: function() { window._rzpDismiss(); }
-      }
-    });
+    var opts = $payload;
+    opts.handler = function(r) {
+      window._rzpSuccess(r.razorpay_payment_id, r.razorpay_order_id, r.razorpay_signature);
+    };
+    opts.modal = {
+      ondismiss: function() { window._rzpDismiss(); }
+    };
+    var rzp = new Razorpay(opts);
     rzp.open();
   } catch(e) {
     console.error('Razorpay error:', e);

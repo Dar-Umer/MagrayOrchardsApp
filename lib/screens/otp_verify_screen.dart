@@ -14,7 +14,21 @@ class OtpVerifyScreen extends StatefulWidget {
 
 class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
+  late final List<FocusNode> _focusNodes = List.generate(
+    4,
+    (i) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_controllers[i].text.isEmpty && i > 0) {
+            _controllers[i - 1].clear();
+            _focusNodes[i - 1].requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ),
+  );
   String? _error;
   int _resendSeconds = 30;
 
@@ -141,39 +155,28 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                       width: 56,
                       height: 60,
                       margin: const EdgeInsets.symmetric(horizontal: 6),
-                      child: RawKeyboardListener(
-                        focusNode: FocusNode(),
-                        onKey: (event) {
-                          if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
-                            if (_controllers[i].text.isEmpty && i > 0) {
-                              _controllers[i - 1].clear();
-                              _focusNodes[i - 1].requestFocus();
-                            }
+                      child: TextField(
+                        controller: _controllers[i],
+                        focusNode: _focusNodes[i],
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        maxLength: 1,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        onChanged: (v) {
+                          setState(() { _error = null; });
+                          if (v.isNotEmpty && i < 3) {
+                            _focusNodes[i + 1].requestFocus();
+                          }
+                          if (v.isNotEmpty && i == 3) {
+                            FocusScope.of(context).unfocus();
+                            _verifyOtp();
                           }
                         },
-                        child: TextField(
-                          controller: _controllers[i],
-                          focusNode: _focusNodes[i],
-                          textAlign: TextAlign.center,
-                          keyboardType: TextInputType.number,
-                          maxLength: 1,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            counterText: '',
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          onChanged: (v) {
-                            setState(() { _error = null; });
-                            if (v.isNotEmpty && i < 3) {
-                              _focusNodes[i + 1].requestFocus();
-                            }
-                            if (v.isNotEmpty && i == 3) {
-                              FocusScope.of(context).unfocus();
-                              _verifyOtp();
-                            }
-                          },
-                        ),
                       ),
                     );
                   }),

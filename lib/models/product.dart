@@ -24,6 +24,8 @@ class Product {
   final String? classification;
   final String? recommendedCrops;
   final String? sku;
+  final double rating;
+  final int reviewsCount;
   final List<ProductImage> images;
   final List<ProductVariant> variants;
   final List<Review> reviews;
@@ -50,6 +52,8 @@ class Product {
     this.classification,
     this.recommendedCrops,
     this.sku,
+    this.rating = 0.0,
+    this.reviewsCount = 0,
     this.images = const [],
     this.variants = const [],
     this.reviews = const [],
@@ -111,6 +115,9 @@ class Product {
           : null;
     }
 
+    final double rating = _toDouble(json['avg_rating'] ?? json['rating'] ?? json['approved_reviews_avg_rating']);
+    final int reviewsCount = (json['reviews_count'] ?? json['approved_reviews_count'] ?? (json['reviews'] is List ? (json['reviews'] as List).length : 0)) as int? ?? 0;
+
     return Product(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
@@ -137,6 +144,8 @@ class Product {
       classification: json['classification'],
       recommendedCrops: json['recommended_crops'],
       sku: json['sku'],
+      rating: rating,
+      reviewsCount: reviewsCount,
       images: images,
       variants: variants,
       reviews: reviews,
@@ -179,6 +188,8 @@ class Product {
       'classification': classification,
       'recommended_crops': recommendedCrops,
       'sku': sku,
+      'avg_rating': rating,
+      'reviews_count': reviewsCount,
       'images': images.map((e) => e.toJson()).toList(),
       'variants': variants.map((e) => e.toJson()).toList(),
       'reviews': reviews.map((e) => e.toJson()).toList(),

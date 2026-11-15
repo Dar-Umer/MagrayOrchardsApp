@@ -45,6 +45,13 @@ class ProductProvider extends ChangeNotifier {
   int _catalogPage = 1;
   bool _catalogHasMore = true;
 
+  // ── Home page infinite product feed (10 per batch upon reaching bottom) ──
+  List<Product> _infiniteProducts = [];
+  bool _infiniteLoading = false;
+  bool _infiniteHasMore = true;
+  int _infinitePage = 0;
+  bool _infiniteInitialized = false;
+
   List<Product> get products => _products;
   List<Product> get featuredProducts => _featuredProducts;
   List<Product> get offerProducts => _offerProducts;
@@ -52,6 +59,7 @@ class ProductProvider extends ChangeNotifier {
   List<Product> get brandProducts => _brandProducts;
   List<Product> get searchProducts => _searchProducts;
   List<Product> get catalogProducts => _catalogProducts;
+  List<Product> get infiniteProducts => _infiniteProducts;
   List<Category> get categories => _categories;
   List<Brand> get brands => _brands;
   List<ServiceModel> get services => _services;
@@ -67,7 +75,24 @@ class ProductProvider extends ChangeNotifier {
   bool get brandLoading => _brandLoading;
   bool get searchLoading => _searchLoading;
   bool get catalogLoading => _catalogLoading;
+  bool get infiniteLoading => _infiniteLoading;
+  bool get infiniteHasMore => _infiniteHasMore;
+  bool get infiniteInitialized => _infiniteInitialized;
   bool get hasMore => _hasMore;
+
+  @visibleForTesting
+  void setInfiniteForTesting({
+    required List<Product> products,
+    required bool loading,
+    required bool hasMore,
+    required bool initialized,
+  }) {
+    _infiniteProducts = products;
+    _infiniteLoading = loading;
+    _infiniteHasMore = hasMore;
+    _infiniteInitialized = initialized;
+    notifyListeners();
+  }
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
@@ -260,6 +285,53 @@ class ProductProvider extends ChangeNotifier {
       sortBy: sortBy,
       page: _catalogPage + 1,
     );
+  }
+
+  /// Reset home page infinite product scroll state so it re-triggers lazily on scroll.
+  void resetInfiniteProducts() {
+    _infinitePage = 0;
+    _infiniteProducts = [];
+    _infiniteHasMore = true;
+    _infiniteInitialized = false;
+    _infiniteLoading = false;
+    notifyListeners();
+  }
+
+  /// Load products 10 per batch for the bottom of the home screen, prioritising top-rated reviews.
+  Future<void> loadMoreInfiniteProducts({bool refresh = false}) async {
+    if (refresh) {
+      _infinitePage = 0;
+      _infiniteProducts = [];
+      _infiniteHasMore = true;
+      _infiniteInitialized = false;
+    }
+    if (_infiniteLoading || !_infiniteHasMore) return;
+    _infiniteLoading = true;
+    notifyListeners();
+    try {
+      final nextPage = _infinitePage + 1;
+      final queryParams = <String, String>{
+        'page': nextPage.toString(),
+        'per_page': '10',
+        'in_stock': 'true',
+        'top_rated': 'true',
+      };
+      final response = await ApiService.get('/products', queryParams: queryParams);
+      final loaded = _extractProducts(response);
+      final more = _parseHasMore(response, loaded.length);
+      final existingIds = _infiniteProducts.map((p) => p.id).toSet();
+      final newItems = loaded.where((p) => !existingIds.contains(p.id)).toList();
+      _infiniteProducts.addAll(newItems);
+      _infinitePage = nextPage;
+      _infiniteHasMore = more && loaded.isNotEmpty;
+      _infiniteInitialized = true;
+    } catch (e) {
+      debugPrint('ProductProvider.loadMoreInfiniteProducts error: $e');
+      _errorMessage = e is ApiException ? e.message : 'Could not load more products.';
+    } finally {
+      _infiniteLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> fetchOfferProducts({int? perPage}) async {

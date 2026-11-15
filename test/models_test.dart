@@ -57,6 +57,45 @@ void main() {
     });
   });
 
+  group('Product Model Tests', () {
+    test('Product.fromJson parses avg_rating and reviews_count', () {
+      final json = {
+        'id': 17,
+        'name': 'Tree Wound Healing Chaubattia Paste 1kg',
+        'slug': 'tree-wound-healing-paste',
+        'price': '320.00',
+        'compare_price': '390.00',
+        'avg_rating': 4.8,
+        'reviews_count': 14,
+        'stock_quantity': 40,
+      };
+
+      final product = Product.fromJson(json);
+      expect(product.id, 17);
+      expect(product.name, 'Tree Wound Healing Chaubattia Paste 1kg');
+      expect(product.rating, 4.8);
+      expect(product.reviewsCount, 14);
+      expect(product.price, 320.0);
+      expect(product.comparePrice, 390.0);
+    });
+
+    test('Product.toJson preserves rating and reviewsCount', () {
+      final product = Product(
+        id: 4,
+        name: 'Apple Orchard Spray Machine',
+        slug: 'spray-machine',
+        price: 15999.0,
+        rating: 5.0,
+        reviewsCount: 22,
+      );
+
+      final json = product.toJson();
+      expect(json['id'], 4);
+      expect(json['avg_rating'], 5.0);
+      expect(json['reviews_count'], 22);
+    });
+  });
+
   group('ProductVariant Model Tests', () {
     test('ProductVariant parses numeric and decimal strings into doubles', () {
       final json = {

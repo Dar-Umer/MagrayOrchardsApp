@@ -23,6 +23,17 @@ class WalletProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void reset() {
+    _balance = 0;
+    _transactions = [];
+    _isLoading = false;
+    _isLoadingTransactions = false;
+    _errorMessage = null;
+    _currentPage = 1;
+    _hasMore = true;
+    notifyListeners();
+  }
+
   Future<void> fetchBalance() async {
     _isLoading = true;
     _errorMessage = null;

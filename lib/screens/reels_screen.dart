@@ -200,11 +200,17 @@ class _ReelViewState extends State<_ReelView> {
     } else {
       final url = widget.reel.videoUrl;
       if (url != null && url.isNotEmpty) {
-        _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-        await _controller!.initialize();
+        final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+        _controller = ctrl;
+        await ctrl.initialize();
+        if (!mounted) {
+          ctrl.dispose();
+          if (_controller == ctrl) _controller = null;
+          return;
+        }
         _chewieController = ChewieController(
-          videoPlayerController: _controller!,
-          autoPlay: true,
+          videoPlayerController: ctrl,
+          autoPlay: widget.isActive,
           looping: true,
           allowMuting: true,
           allowPlaybackSpeedChanging: false,

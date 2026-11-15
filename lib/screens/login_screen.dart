@@ -6,9 +6,6 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PhoneInputScreen()));
-    });
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const PhoneInputScreen(initialRegister: false);
   }
 }

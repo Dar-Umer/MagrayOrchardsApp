@@ -31,6 +31,16 @@ class OrderProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   void clearError() { _errorMessage = null; notifyListeners(); }
 
+  void reset() {
+    _orders = [];
+    _lastCreatedOrder = null;
+    _statusFilter = null;
+    _searchQuery = '';
+    _errorMessage = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   void setStatusFilter(String? status) {
     _statusFilter = status;
     notifyListeners();

@@ -33,6 +33,7 @@ class PushService {
   FirebaseMessaging? _messaging;
   String? _token;
   String? _pendingToken;
+  StreamSubscription<String>? _tokenRefreshSub;
 
   /// Whether Firebase config is present (enables real push delivery).
   bool get isConfigured => _configured;
@@ -118,7 +119,8 @@ class PushService {
   /// Refreshes the token (fires when FCM rotates it).
   Future<void> watchTokenRefresh(AuthProvider auth) async {
     if (!_configured) return;
-    _messaging!.onTokenRefresh.listen((newToken) {
+    await _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = _messaging!.onTokenRefresh.listen((newToken) {
       _token = newToken;
       if (auth.isLoggedIn) {
         ApiService.registerDeviceToken(newToken).catchError((e) {

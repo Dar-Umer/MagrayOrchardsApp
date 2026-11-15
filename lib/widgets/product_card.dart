@@ -173,6 +173,42 @@ class ProductCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (product.rating > 0) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  product.rating.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.star_rounded, size: 11, color: Colors.white),
+                              ],
+                            ),
+                          ),
+                          if (product.reviewsCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${product.reviewsCount})',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -210,8 +246,8 @@ class ProductCard extends StatelessWidget {
                       Row(
                         children: [
                           SizedBox(
-                            width: 36,
-                            height: 36,
+                            width: 40,
+                            height: 40,
                             child: IconButton.outlined(
                               tooltip: 'Add to Cart',
                               onPressed: () => _handleAddToCart(context),
@@ -222,18 +258,18 @@ class ProductCard extends StatelessWidget {
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10)),
                               ),
-                              icon: const Icon(Icons.add_shopping_cart_rounded, size: 17),
+                              icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: SizedBox(
-                              height: 36,
+                              height: 40,
                               child: FilledButton(
                                 onPressed: () => _handleBuyNow(context),
                                 style: FilledButton.styleFrom(
-                                  minimumSize: const Size(0, 36),
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  minimumSize: const Size(0, 40),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10)),
                                 ),
@@ -241,7 +277,7 @@ class ProductCard extends StatelessWidget {
                                   'Buy Now',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Colors.white, fontSize: 12),
+                                  style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),

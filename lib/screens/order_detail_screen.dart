@@ -10,6 +10,7 @@ import '../providers/order_provider.dart';
 import '../services/api_service.dart';
 import '../services/shop_config.dart';
 import '../utils/formatters.dart';
+import '../widgets/app_network_image.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order? order;
@@ -516,8 +517,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: imageUrl != null
-                        ? Image.network(imageUrl, width: 50, height: 50, fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _itemPlaceholder(cs))
+                        ? AppNetworkImage(
+                            imageUrl: imageUrl,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _itemPlaceholder(cs),
+                          )
                         : _itemPlaceholder(cs),
                   ),
                   const SizedBox(width: 12),

@@ -225,7 +225,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // Pre-fetch home screen feeds in the background while splash finishes
-    if (mounted) {
+    if (mounted && auth.isLoggedIn) {
       try {
         final pp = context.read<ProductProvider>();
         if (pp.products.isEmpty) {
@@ -252,10 +252,12 @@ class _SplashScreenState extends State<SplashScreen> {
     }
     if (!mounted) return;
 
+    final destination = auth.isLoggedIn ? const HomeScreen() : const PhoneInputScreen();
+
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
         transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 350),

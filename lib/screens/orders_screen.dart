@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/app_network_image.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_box.dart';
 import '../config/api_config.dart';
@@ -272,8 +273,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: imageUrl != null
-                        ? Image.network(imageUrl, width: 60, height: 60, fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _itemPlaceholder(cs))
+                        ? AppNetworkImage(
+                            imageUrl: imageUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _itemPlaceholder(cs),
+                          )
                         : _itemPlaceholder(cs),
                   ),
                   const SizedBox(width: 14),

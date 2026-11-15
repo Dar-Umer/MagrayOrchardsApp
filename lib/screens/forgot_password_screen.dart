@@ -24,7 +24,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
-  final List<FocusNode> _otpFocusNodes = List.generate(4, (_) => FocusNode());
+  late final List<FocusNode> _otpFocusNodes = List.generate(
+    4,
+    (i) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_otpControllers[i].text.isEmpty && i > 0) {
+            _otpControllers[i - 1].clear();
+            _otpFocusNodes[i - 1].requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ),
+  );
   final _formKey = GlobalKey<FormState>();
   bool _otpSent = false;
   String? _error;
@@ -223,32 +237,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           width: 56,
                           height: 60,
                           margin: const EdgeInsets.symmetric(horizontal: 6),
-                          child: RawKeyboardListener(
-                            focusNode: FocusNode(),
-                            onKey: (event) {
-                              if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
-                                if (_otpControllers[i].text.isEmpty && i > 0) {
-                                  _otpControllers[i - 1].clear();
-                                  _otpFocusNodes[i - 1].requestFocus();
-                                }
+                          child: TextField(
+                            controller: _otpControllers[i],
+                            focusNode: _otpFocusNodes[i],
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            maxLength: 1,
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(counterText: '', contentPadding: EdgeInsets.zero),
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            onChanged: (v) {
+                              setState(() { _error = null; });
+                              if (v.isNotEmpty && i < 3) {
+                                _otpFocusNodes[i + 1].requestFocus();
                               }
                             },
-                            child: TextField(
-                              controller: _otpControllers[i],
-                              focusNode: _otpFocusNodes[i],
-                              textAlign: TextAlign.center,
-                              keyboardType: TextInputType.number,
-                              maxLength: 1,
-                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                              decoration: const InputDecoration(counterText: '', contentPadding: EdgeInsets.zero),
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              onChanged: (v) {
-                                setState(() { _error = null; });
-                                if (v.isNotEmpty && i < 3) {
-                                  _otpFocusNodes[i + 1].requestFocus();
-                                }
-                              },
-                            ),
                           ),
                         );
                       }),

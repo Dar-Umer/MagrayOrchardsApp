@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/wishlist_provider.dart';
+import '../providers/personalization_provider.dart';
 import '../services/api_service.dart';
 import '../utils/app_navigation.dart';
 import '../widgets/star_rating.dart';
@@ -41,6 +42,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _product = widget.product;
     _loadProductDetail();
     _maybeAutoCheckDefaultAddress();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_product != null) {
+        context.read<PersonalizationProvider>().logProductView(_product!);
+      }
+    });
   }
 
   void _maybeAutoCheckDefaultAddress() {
@@ -182,7 +189,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cart = context.watch<CartProvider>();
 
     return Scaffold(
       body: LayoutBuilder(
@@ -270,7 +276,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           );
         },
       ),
-      bottomNavigationBar: _buildMobileBottomBar(theme, cart),
+      bottomNavigationBar: _buildMobileBottomBar(theme),
     );
   }
 
@@ -366,18 +372,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildPriceRow(ThemeData theme) {
     final gold = Theme.of(context).colorScheme.secondary;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 10,
+      runSpacing: 6,
       children: [
-        Text('Rs. ${_currentPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
+        Text(
+          'Rs. ${_currentPrice.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.primary,
+          ),
+        ),
         if (_currentComparePrice != null && _currentComparePrice! > _currentPrice) ...[
-          const SizedBox(width: 10),
-          Text('Rs. ${_currentComparePrice!.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, color: Colors.grey.shade500, decoration: TextDecoration.lineThrough)),
-          const SizedBox(width: 8),
+          Text(
+            'Rs. ${_currentComparePrice!.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade500,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: gold, borderRadius: BorderRadius.circular(6)),
-            child: Text('$_discountPercent% OFF', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+            decoration: BoxDecoration(
+              color: gold,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$_discountPercent% OFF',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ],
@@ -722,7 +752,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildMobileBottomBar(ThemeData theme, CartProvider cart) {
+  Widget _buildMobileBottomBar(ThemeData theme) {
     if (!_inStock) return const SizedBox.shrink();
     return Container(
       padding: EdgeInsets.fromLTRB(16, 10, 16, MediaQuery.of(context).padding.bottom + 10),

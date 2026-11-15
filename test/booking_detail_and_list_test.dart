@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:magray_orchards/models/service_booking.dart';
 import 'package:magray_orchards/providers/auth_provider.dart';
 import 'package:magray_orchards/screens/booking_detail_screen.dart';
-import 'package:magray_orchards/screens/my_bookings_screen.dart';
 
 void main() {
   setUp(() {

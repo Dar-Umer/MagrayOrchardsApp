@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
 import '../utils/formatters.dart';
+import '../widgets/app_network_image.dart';
 import '../widgets/empty_state.dart';
 
 class BookingDetailScreen extends StatefulWidget {
@@ -425,12 +426,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: imageUrl != null
-                  ? Image.network(
-                      imageUrl,
+                  ? AppNetworkImage(
+                      imageUrl: imageUrl,
                       width: 72,
                       height: 72,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _servicePlaceholder(cs),
+                      errorWidget: (_, __, ___) => _servicePlaceholder(cs),
                     )
                   : _servicePlaceholder(cs),
             ),

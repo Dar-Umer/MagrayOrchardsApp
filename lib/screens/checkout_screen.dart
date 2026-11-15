@@ -1041,7 +1041,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    height: 40,
+                    height: 46,
                     child: ElevatedButton(
                       onPressed: _couponLoading ? null : _applyCoupon,
                       style: ElevatedButton.styleFrom(

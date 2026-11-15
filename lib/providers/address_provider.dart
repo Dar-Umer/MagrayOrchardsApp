@@ -11,6 +11,14 @@ class AddressProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   void clearError() { _errorMessage = null; notifyListeners(); }
 
+  void reset() {
+    _addresses = [];
+    _selectedAddressId = null;
+    _errorMessage = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   List<Address> get addresses => _addresses;
   bool get isLoading => _isLoading;
   Address? get defaultAddress =>

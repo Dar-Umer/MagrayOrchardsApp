@@ -67,18 +67,17 @@ class ApiService {
     }
 
     if (response.statusCode == 401) {
-      final body = response.body.isNotEmpty ? json.decode(response.body) : null;
-      final message = _extractMessage(body, '');
-      if (message.isNotEmpty) {
-        throw ApiException(
-          statusCode: 401,
-          message: message,
-        );
-      }
       _onUnauthorized?.call();
+      final body = response.body.isNotEmpty ? json.decode(response.body) : null;
+      final message = _extractMessage(
+        body,
+        'Your session has expired. Please log in again.',
+      );
       throw ApiException(
         statusCode: 401,
-        message: 'Your session has expired. Please log in again.',
+        message: message.isNotEmpty
+            ? message
+            : 'Your session has expired. Please log in again.',
       );
     }
 
@@ -142,7 +141,9 @@ class ApiService {
         message: 'Could not connect to the server. Please try again.',
       );
     } catch (e, s) {
-      debugPrint('ApiService._makeRequest unexpected error: $e\n$s');
+      if (kDebugMode) {
+        debugPrint('ApiService._makeRequest unexpected error: $e\n$s');
+      }
       rethrow;
     }
   }

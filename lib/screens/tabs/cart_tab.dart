@@ -452,7 +452,7 @@ class _CartTabState extends State<CartTab> {
                               ),
                               const SizedBox(width: 8),
                               SizedBox(
-                                height: 40,
+                                height: 46,
                                 child: ElevatedButton(
                                   onPressed: _shippingLoading
                                       ? null

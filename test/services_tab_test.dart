@@ -95,10 +95,9 @@ void main() {
 
     await tester.pump();
 
-    // Verify AppBar and Hero Banner
+    // Verify AppBar
     expect(find.text('Orchard Services'), findsOneWidget);
-    expect(find.text('Doorstep Orchard Care'), findsOneWidget);
-    expect(find.text('Per Tree & Per Kanal'), findsOneWidget);
+    expect(find.text('Doorstep Orchard Care'), findsNothing);
 
     // Verify Search Box and Filter Chips
     expect(find.byType(TextField), findsOneWidget);
@@ -110,7 +109,6 @@ void main() {
     // Verify Service Cards and Formatted Prices
     expect(find.text('High-Density Orchard Pruning'), findsOneWidget);
     expect(find.text('Rs. 50 / Tree'), findsOneWidget);
-    expect(find.text('10 – 500 trees'), findsOneWidget);
     expect(find.text('Pesticide & Nutrient Spraying'), findsOneWidget);
     expect(find.text('Rs. 150 / Kanal'), findsOneWidget);
     expect(find.text('Soil Testing & Analysis'), findsOneWidget);

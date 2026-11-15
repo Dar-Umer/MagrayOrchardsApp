@@ -7,12 +7,13 @@ class ThemeProvider extends ChangeNotifier {
   String _paletteName = 'rose';
   String _fontFamily = 'Inter';
   bool _isLoading = false;
+  ThemeData? _cachedThemeData;
 
   String get paletteName => _paletteName;
   String get fontFamily => _fontFamily;
   bool get isLoading => _isLoading;
 
-  ThemeData get themeData => ThemeConfig.buildThemeData(
+  ThemeData get themeData => _cachedThemeData ??= ThemeConfig.buildThemeData(
         paletteName: _paletteName,
         fontFamily: _fontFamily,
       );
@@ -52,6 +53,7 @@ class ThemeProvider extends ChangeNotifier {
       }
 
       if (changed) {
+        _cachedThemeData = null;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('theme_palette', _paletteName);
         await prefs.setString('theme_font', _fontFamily);
@@ -63,6 +65,7 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> setPalette(String name) async {
     if (!ThemeConfig.palettes.containsKey(name)) return;
     _paletteName = name;
+    _cachedThemeData = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_palette', name);
     notifyListeners();
@@ -71,6 +74,7 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> setFont(String name) async {
     if (!ThemeConfig.fonts.containsKey(name)) return;
     _fontFamily = name;
+    _cachedThemeData = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_font', name);
     notifyListeners();

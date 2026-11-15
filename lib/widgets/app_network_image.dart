@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'app_loading_indicator.dart';
 
 class AppNetworkImage extends StatelessWidget {
   final String imageUrl;
@@ -10,6 +11,8 @@ class AppNetworkImage extends StatelessWidget {
   final Widget Function(BuildContext, String)? placeholder;
   final Widget Function(BuildContext, String, Object)? errorWidget;
   final Duration fadeInDuration;
+  final int? memCacheWidth;
+  final int? memCacheHeight;
 
   const AppNetworkImage({
     super.key,
@@ -20,6 +23,8 @@ class AppNetworkImage extends StatelessWidget {
     this.placeholder,
     this.errorWidget,
     this.fadeInDuration = const Duration(milliseconds: 300),
+    this.memCacheWidth,
+    this.memCacheHeight,
   });
 
   @override
@@ -29,7 +34,7 @@ class AppNetworkImage extends StatelessWidget {
           width: width,
           height: height,
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          child: const Center(child: AppLoadingIndicator.small()),
         );
 
     final defaultError = errorWidget?.call(context, imageUrl, Exception('Failed to load image')) ??
@@ -55,11 +60,16 @@ class AppNetworkImage extends StatelessWidget {
       );
     }
 
+    final computedMemWidth = memCacheWidth ?? (width != null ? (width! * 2).toInt() : 600);
+    final computedMemHeight = memCacheHeight ?? (height != null ? (height! * 2).toInt() : null);
+
     return CachedNetworkImage(
       imageUrl: imageUrl,
       fit: fit,
       width: width,
       height: height,
+      memCacheWidth: computedMemWidth,
+      memCacheHeight: computedMemHeight,
       fadeInDuration: fadeInDuration,
       placeholder: (_, __) => defaultPlaceholder,
       errorWidget: (_, __, ___) => defaultError,
