@@ -1,9 +1,9 @@
 /// API endpoint configuration.
 ///
-/// Defaults to the production API (https://magrayorchards.com). Override at
+/// Defaults to the production API (http://magrayorchards.com). Override at
 /// build/run time with dart-define flags, e.g.:
 ///   flutter run --dart-define=API_BASE_URL=http://localhost:8000/api
-///   flutter build apk --dart-define=API_BASE_URL=http://localhost:8000/api
+///   flutter build appbundle --dart-define=API_BASE_URL=http://magrayorchards.com/api
 ///
 /// The image base URL is derived from [baseUrl] unless API_IMAGE_BASE_URL is
 /// provided explicitly.
@@ -11,7 +11,7 @@ class ApiConfig {
   static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
   static const String _imageBaseUrlOverride = String.fromEnvironment('API_IMAGE_BASE_URL');
 
-  static const String _defaultBaseUrl = 'https://magrayorchards.com/api';
+  static const String _defaultBaseUrl = 'http://magrayorchards.com/api';
 
   static String get baseUrl {
     if (_baseUrlOverride.isNotEmpty) {
