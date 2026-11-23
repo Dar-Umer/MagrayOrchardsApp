@@ -15,6 +15,7 @@ import 'providers/notification_provider.dart';
 import 'providers/personalization_provider.dart';
 import 'services/shop_config.dart';
 import 'services/push_service.dart';
+import 'services/location_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/phone_input_screen.dart';
@@ -137,6 +138,7 @@ class MagrayOrchardsApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReelsProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => PersonalizationProvider()),
+        ChangeNotifierProvider.value(value: LocationService.instance),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

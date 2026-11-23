@@ -203,7 +203,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e is ApiException ? e.message : 'This coupon code is not valid.'}'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e is ApiException ? e.message : 'This coupon code is not valid.'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -1030,18 +1030,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Expanded(
                     child: TextField(
                       controller: _couponController,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: 'Enter coupon code',
-                        hintStyle: const TextStyle(fontSize: 14),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        hintStyle: TextStyle(fontSize: 14),
                         isDense: true,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    height: 46,
+                    height: 48,
                     child: ElevatedButton(
                       onPressed: _couponLoading ? null : _applyCoupon,
                       style: ElevatedButton.styleFrom(
@@ -1054,7 +1052,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               height: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text('Apply', style: TextStyle(color: Colors.white)),
+                          : const Text('Apply', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -1222,7 +1220,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: ElevatedButton(
         onPressed: _placingOrder ? null : _placeOrder,
         style: ElevatedButton.styleFrom(
-          backgroundColor: cs.secondary,
+          backgroundColor: cs.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),

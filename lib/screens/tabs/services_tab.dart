@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
+import '../../config/theme_config.dart';
 import '../../models/service_model.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/app_network_image.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/skeleton_box.dart';
+import '../../services/location_service.dart';
 import '../my_bookings_screen.dart';
 import '../service_detail_screen.dart';
 
@@ -26,6 +28,8 @@ class _ServicesTabState extends State<ServicesTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().fetchServices();
+      // Prompt GPS & detect district travel in background when opening Services!
+      context.read<LocationService>().promptAndDetectLocation(context);
     });
   }
 
@@ -118,6 +122,10 @@ class _ServicesTabState extends State<ServicesTab> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   children: [
+                    // GPS Location & District Travel Banner
+                    _buildLocationDetectionBar(primary),
+                    const SizedBox(height: 10),
+
                     // 1. Search Box
                     _buildSearchBar(),
 
@@ -192,16 +200,129 @@ class _ServicesTabState extends State<ServicesTab> {
     );
   }
 
+  Widget _buildLocationDetectionBar(Color primary) {
+    return Consumer<LocationService>(
+      builder: (context, loc, _) {
+        if (loc.isLocating) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 15,
+                  height: 15,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFB45309)),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Detecting orchard GPS location & calculating travel...',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (loc.hasLocation) {
+          final zone = loc.districtZoneName != null ? ' • ${loc.districtZoneName}' : '';
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_rounded, size: 18, color: Color(0xFF16A34A)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Orchard: ${loc.address ?? "GPS detected"}$zone',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF15803D),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                InkWell(
+                  onTap: () => loc.promptAndDetectLocation(context, force: true),
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Text(
+                      'Update',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.near_me_outlined, size: 18, color: Colors.grey.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Set orchard location to auto-calculate district travel rates',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => loc.promptAndDetectLocation(context, force: true),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                child: const Text('Turn On GPS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -209,14 +330,14 @@ class _ServicesTabState extends State<ServicesTab> {
       child: TextField(
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val.trim()),
-        style: const TextStyle(fontSize: 14),
+        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
         decoration: InputDecoration(
           hintText: 'Search services (e.g. pruning, spraying, soil)...',
-          hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-          prefixIcon: Icon(Icons.search_rounded, size: 21, color: Colors.grey.shade500),
+          hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+          prefixIcon: const Icon(Icons.search_rounded, size: 21, color: AppColors.textSecondary),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.cancel_rounded, size: 18, color: Colors.grey.shade400),
+                  icon: const Icon(Icons.cancel_rounded, size: 18, color: AppColors.textMuted),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -264,22 +385,22 @@ class _ServicesTabState extends State<ServicesTab> {
           ? Icon(
               icon,
               size: 15,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
             )
           : null,
       label: Text(label),
       labelStyle: TextStyle(
         fontSize: 12.5,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-        color: isSelected ? Colors.white : Colors.grey.shade800,
+        color: isSelected ? Colors.white : AppColors.textPrimary,
       ),
       selected: isSelected,
       selectedColor: primary,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: isSelected ? primary : Colors.grey.shade200,
+          color: isSelected ? primary : AppColors.border,
           width: isSelected ? 1.5 : 1,
         ),
       ),
@@ -291,26 +412,25 @@ class _ServicesTabState extends State<ServicesTab> {
   Widget _buildServiceCard(
       BuildContext context, ServiceModel service, Color primary) {
     final visuals = _getServiceVisuals(service, primary);
-    final cardBg = Theme.of(context).cardColor;
 
     return Container(
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.18)),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -328,30 +448,30 @@ class _ServicesTabState extends State<ServicesTab> {
                   children: [
                     // Distinct Service Visual Icon / Thumbnail
                     Container(
-                      width: 60,
-                      height: 60,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         color: visuals.bg,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: visuals.fg.withValues(alpha: 0.12),
                         ),
                       ),
                       child: service.image != null
                           ? ClipRRect(
-                              borderRadius: BorderRadius.circular(13),
+                              borderRadius: BorderRadius.circular(11),
                               child: AppNetworkImage(
                                 imageUrl:
                                     '${ApiConfig.imageBaseUrl}${service.image}',
                                 fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => Icon(
+                                errorWidget: (errContext, errUrl, err) => Icon(
                                   visuals.icon,
                                   color: visuals.fg,
-                                  size: 28,
+                                  size: 26,
                                 ),
                               ),
                             )
-                          : Icon(visuals.icon, color: visuals.fg, size: 28),
+                          : Icon(visuals.icon, color: visuals.fg, size: 26),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -362,7 +482,8 @@ class _ServicesTabState extends State<ServicesTab> {
                             service.name,
                             style: const TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                               height: 1.25,
                             ),
                           ),
@@ -371,10 +492,10 @@ class _ServicesTabState extends State<ServicesTab> {
                             const SizedBox(height: 4),
                             Text(
                               service.categoryName!,
-                              style: TextStyle(
-                                fontSize: 11.5,
+                              style: const TextStyle(
+                                fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade500,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -391,18 +512,18 @@ class _ServicesTabState extends State<ServicesTab> {
                   service.shortDescription ?? service.description ?? '',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade600,
-                    height: 1.4,
+                    color: AppColors.textSecondary,
+                    height: 1.45,
                   ),
                 ),
 
                 const SizedBox(height: 14),
-                Divider(
+                const Divider(
                   height: 1,
                   thickness: 1,
-                  color: Colors.grey.withValues(alpha: 0.12),
+                  color: AppColors.border,
                 ),
                 const SizedBox(height: 12),
 
@@ -413,12 +534,12 @@ class _ServicesTabState extends State<ServicesTab> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Service Rate',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade500,
+                            color: AppColors.textMuted,
                             letterSpacing: 0.4,
                           ),
                         ),

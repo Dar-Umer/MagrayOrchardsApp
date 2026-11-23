@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/service_booking.dart';
+import '../models/service_model.dart';
 
 class ApiService {
   static String? _token;
@@ -188,17 +189,27 @@ class ApiService {
 
   // ─── Service bookings ─────────────────────────────────────────────────
 
-  /// Price quote for a service at an optional destination and quantity. Public.
+  /// Fetch complete service detail including active tier rates, plant types, and age groups.
+  static Future<ServiceModel> fetchServiceDetail(String slug) async {
+    final response = await get('/services/$slug');
+    final data = Map<String, dynamic>.from((response as Map)['data'] as Map);
+    return ServiceModel.fromJson(data);
+  }
+
+  /// Price quote for a service at an optional destination, quantity or itemized tree breakdown. Public.
   static Future<Map<String, dynamic>> fetchQuote(
     String slug, {
     double? latitude,
     double? longitude,
     int? quantity,
+    List<Map<String, dynamic>>? treeItems,
   }) async {
     final response = await get('/services/$slug/quote', queryParams: {
       if (latitude != null) 'latitude': latitude.toString(),
       if (longitude != null) 'longitude': longitude.toString(),
       if (quantity != null) 'quantity': quantity.toString(),
+      if (treeItems != null && treeItems.isNotEmpty)
+        'tree_items': jsonEncode(treeItems),
     });
     return Map<String, dynamic>.from((response as Map)['data'] as Map);
   }
@@ -209,6 +220,8 @@ class ApiService {
     DateTime? endDate,
     int? serviceId,
     String? serviceSlug,
+    double? latitude,
+    double? longitude,
   }) async {
     final response = await get('/bookings/availability', queryParams: {
       if (startDate != null) 'start_date': _dateStr(startDate),
@@ -216,6 +229,8 @@ class ApiService {
       if (serviceId != null) 'service_id': serviceId.toString(),
       if (serviceSlug != null && serviceSlug.isNotEmpty)
         'service_slug': serviceSlug,
+      if (latitude != null) 'latitude': latitude.toString(),
+      if (longitude != null) 'longitude': longitude.toString(),
     });
     final data = Map<String, dynamic>.from((response as Map)['data'] as Map);
     final dates = data['dates'] is Map
@@ -225,22 +240,42 @@ class ApiService {
         MapEntry(key, Map<String, dynamic>.from(value as Map)));
   }
 
+  /// Check slot capacity and availability for a single date.
+  static Future<Map<String, dynamic>> fetchDateAvailability(
+    DateTime date, {
+    int? serviceId,
+    String? serviceSlug,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final response = await get('/bookings/availability', queryParams: {
+      'date': _dateStr(date),
+      if (serviceId != null) 'service_id': serviceId.toString(),
+      if (serviceSlug != null && serviceSlug.isNotEmpty)
+        'service_slug': serviceSlug,
+      if (latitude != null) 'latitude': latitude.toString(),
+      if (longitude != null) 'longitude': longitude.toString(),
+    });
+    return Map<String, dynamic>.from((response as Map)['data'] as Map);
+  }
+
   /// Create a service booking. Auth required. Returns the persisted booking map.
   static Future<Map<String, dynamic>> createServiceBooking({
     required String slug,
     required DateTime bookingDate,
-    required String timeSlot,
+    String? timeSlot,
     double? latitude,
     double? longitude,
     String? address,
     String? notes,
     String? orchardDetails,
     int? quantity,
+    List<Map<String, dynamic>>? treeItems,
     String paymentMethod = 'visit',
   }) async {
     final response = await post('/services/$slug/book', body: {
       'booking_date': _dateStr(bookingDate),
-      'booking_time': timeSlot,
+      'booking_time': timeSlot ?? 'full_day',
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (address != null && address.isNotEmpty) 'address': address,
@@ -248,6 +283,8 @@ class ApiService {
       if (orchardDetails != null && orchardDetails.isNotEmpty)
         'orchard_details': orchardDetails,
       if (quantity != null && quantity > 0) 'quantity': quantity,
+      if (treeItems != null && treeItems.isNotEmpty)
+        'tree_items': treeItems,
       'payment_method': paymentMethod,
     });
     final body = Map<String, dynamic>.from(response as Map);

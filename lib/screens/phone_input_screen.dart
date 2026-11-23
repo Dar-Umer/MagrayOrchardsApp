@@ -540,7 +540,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
                           // Primary Action Button
                           SizedBox(
-                            height: 50,
+                            height: 48,
                             child: ElevatedButton(
                               onPressed: auth.isLoading ? null : _submit,
                               style: ElevatedButton.styleFrom(
@@ -548,7 +548,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               child: auth.isLoading

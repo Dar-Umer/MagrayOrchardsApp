@@ -90,7 +90,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${e is ApiException ? e.message : 'Could not update your profile. Please try again.'}'),
+            content: Text(e is ApiException ? e.message : 'Could not update your profile. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -158,7 +158,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   decoration: InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -174,10 +173,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Phone Number',
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: Icon(Icons.phone_outlined),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -194,11 +192,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextFormField(
                   initialValue: user?.email ?? '',
                   readOnly: true,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    suffixIcon: const Icon(Icons.lock_outline, size: 18),
+                    prefixIcon: Icon(Icons.email_outlined),
+                    suffixIcon: Icon(Icons.lock_outline, size: 18),
                   ),
                 ),
                 const SizedBox(height: 8),

@@ -257,9 +257,13 @@ class ProfileTab extends StatelessWidget {
                         Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
                       }
                     },
-                    icon: const Icon(Icons.logout, color: Colors.red),
-                    label:
-                        const Text('Logout', style: TextStyle(color: Colors.red)),
+                    icon: const Icon(Icons.logout, color: Color(0xFFDC2626)),
+                    label: const Text('Logout', style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFECACA), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      minimumSize: const Size(48, 48),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

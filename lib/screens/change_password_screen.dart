@@ -132,9 +132,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       decoration: InputDecoration(
                         labelText: 'Current Password',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                         suffixIcon: IconButton(
                           tooltip: _hideCurrent ? 'Show password' : 'Hide password',
                           onPressed: () =>
@@ -160,9 +157,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       decoration: InputDecoration(
                         labelText: 'New Password',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                         suffixIcon: IconButton(
                           tooltip: _hideNew ? 'Show password' : 'Hide password',
                           onPressed: () => setState(() => _hideNew = !_hideNew),
@@ -190,9 +184,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       decoration: InputDecoration(
                         labelText: 'Confirm New Password',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                         suffixIcon: IconButton(
                           tooltip: _hideConfirm ? 'Show password' : 'Hide password',
                           onPressed: () =>

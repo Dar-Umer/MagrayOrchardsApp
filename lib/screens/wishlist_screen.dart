@@ -234,28 +234,28 @@ class _WishlistScreenState extends State<WishlistScreen> {
                             color: Colors.red,
                           ),
                           onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
                             final wasInWishlist = provider.isInWishlist(product.id);
                             await provider.toggleWishlist(product.id);
-                            if (mounted) {
-                              if (provider.errorMessage != null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(provider.errorMessage!),
-                                    backgroundColor: Colors.red,
+                            if (!mounted) return;
+                            if (provider.errorMessage != null) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(provider.errorMessage!),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            } else {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    wasInWishlist
+                                        ? 'Removed from wishlist'
+                                        : 'Added to wishlist',
                                   ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      wasInWishlist
-                                          ? 'Removed from wishlist'
-                                          : 'Added to wishlist',
-                                    ),
-                                    backgroundColor: cs.primary,
-                                  ),
-                                );
-                              }
+                                  backgroundColor: cs.primary,
+                                ),
+                              );
                             }
                           },
                         ),

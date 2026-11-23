@@ -202,7 +202,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 title: const Text('Set as Default'),
                 value: _isDefault,
                 onChanged: (v) => setState(() => _isDefault = v),
-                activeColor: Theme.of(context).colorScheme.primary,
+                activeTrackColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                activeThumbColor: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -211,7 +212,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -219,7 +220,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(isEditing ? 'Update Address' : 'Add Address',
                           style: const TextStyle(
-                              fontSize: 16, color: Colors.white)),
+                              fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -244,7 +245,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         labelText: label,
         prefixIcon: Icon(icon),
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: required
           ? (v) => v == null || v.isEmpty ? '$label is required' : null

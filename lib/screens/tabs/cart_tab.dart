@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
+import '../../config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/shop_config.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/app_network_image.dart';
+import '../../widgets/app_quantity_input.dart';
 import '../../widgets/empty_state.dart';
 import '../login_screen.dart';
 import '../product_search_screen.dart';
@@ -86,23 +88,11 @@ class _CartTabState extends State<CartTab> {
     if (mounted) setState(() => _shippingLoading = false);
   }
 
-  void _decrementOrRemove(CartProvider cart, CartItem item) {
-    if (item.quantity > 1) {
-      cart.updateQuantity(
-        item.product.id,
-        item.quantity - 1,
-        variantId: item.variant?.id,
-      );
-      return;
-    }
-
+  void _removeItemWithUndo(CartProvider cart, CartItem item) {
     final removedProduct = item.product;
     final removedVariant = item.variant;
-    cart.updateQuantity(
-      removedProduct.id,
-      0,
-      variantId: removedVariant?.id,
-    );
+    final previousQty = item.quantity;
+    cart.removeItem(item.product.id, variantId: item.variant?.id);
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -116,7 +106,7 @@ class _CartTabState extends State<CartTab> {
             onPressed: () {
               cart.addItem(
                 removedProduct,
-                quantity: 1,
+                quantity: previousQty,
                 variant: removedVariant,
               );
             },
@@ -328,39 +318,25 @@ class _CartTabState extends State<CartTab> {
                               ),
                             ),
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  tooltip: item.quantity > 1
-                                      ? 'Decrease quantity'
-                                      : 'Remove item',
-                                  icon: Icon(
-                                    item.quantity > 1
-                                        ? Icons.remove_circle_outline
-                                        : Icons.delete_outline,
-                                    size: 22,
-                                    color: item.quantity == 1 ? Colors.red.shade400 : null,
-                                  ),
-                                  onPressed: () => _decrementOrRemove(cart, item),
+                                AppQuantityInput(
+                                  value: item.quantity,
+                                  min: 1,
+                                  max: item.product.stockQuantity > 0 ? item.product.stockQuantity : 1000,
+                                  onChanged: (newQty) {
+                                    cart.updateQuantity(
+                                      item.product.id,
+                                      newQty,
+                                      variantId: item.variant?.id,
+                                    );
+                                  },
                                 ),
-                                Text(
-                                  '${item.quantity}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                const SizedBox(width: 4),
                                 IconButton(
-                                  tooltip: 'Increase quantity',
-                                  icon: Icon(
-                                    Icons.add_circle_outline,
-                                    size: 22,
-                                    color: primary,
-                                  ),
-                                  onPressed: () => cart.updateQuantity(
-                                    item.product.id,
-                                    item.quantity + 1,
-                                    variantId: item.variant?.id,
-                                  ),
+                                  tooltip: 'Remove item',
+                                  icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+                                  onPressed: () => _removeItemWithUndo(cart, item),
                                 ),
                               ],
                             ),
@@ -436,23 +412,20 @@ class _CartTabState extends State<CartTab> {
                                   controller: _pincodeController,
                                   keyboardType: TextInputType.number,
                                   maxLength: 6,
-                                  decoration: InputDecoration(
+                                  decoration: const InputDecoration(
                                     hintText: 'Enter pincode',
                                     counterText: '',
                                     isDense: true,
-                                    prefixIcon: const Icon(
+                                    prefixIcon: Icon(
                                       Icons.location_on_outlined,
                                       size: 18,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               SizedBox(
-                                height: 46,
+                                height: 48,
                                 child: ElevatedButton(
                                   onPressed: _shippingLoading
                                       ? null

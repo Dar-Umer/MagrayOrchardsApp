@@ -1,6 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Centralized semantic color tokens for Magray Orchards.
+class AppColors {
+  AppColors._();
+
+  // Primary Brand (Burgundy)
+  static const Color primary = Color(0xFF800020);
+  static const Color primaryDark = Color(0xFF68051E);
+  static const Color primarySoft = Color(0xFFFCE7EA);
+
+  // Natural Emerald Accent
+  static const Color accent = Color(0xFF15803D);
+  static const Color accentDark = Color(0xFF166534);
+  static const Color accentSoft = Color(0xFFF0FDF4);
+
+  // Status & Feedback
+  static const Color warning = Color(0xFFD97706);
+  static const Color warningSoft = Color(0xFFFEF3C7);
+  static const Color error = Color(0xFFDC2626);
+  static const Color errorSoft = Color(0xFFFEF2F2);
+
+  // Neutral Surfaces & Borders
+  static const Color canvas = Color(0xFFF8FAFC);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color border = Color(0xFFE2E8F0);
+  static const Color borderMedium = Color(0xFFCBD5E1);
+
+  // Typography
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF64748B);
+  static const Color textMuted = Color(0xFF94A3B8);
+}
+
 class ThemeConfig {
   ThemeConfig._();
 
@@ -148,7 +180,7 @@ class ThemeConfig {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: surface,
+      scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       fontFamily: fontFamily,
       textTheme: TextTheme(
         displaySmall: baseText.copyWith(fontSize: 34, fontWeight: FontWeight.w800, height: 1.12, letterSpacing: -0.5),
@@ -202,22 +234,22 @@ class ThemeConfig {
         elevation: 0,
         color: surfaceCard,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
+        shadowColor: Colors.black.withValues(alpha: 0.04),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: borderSubtle),
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         margin: EdgeInsets.zero,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: accent,
+          backgroundColor: primary,
           foregroundColor: Colors.white,
           elevation: 0,
           shadowColor: Colors.transparent,
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.2),
         ),
       ),
@@ -227,17 +259,17 @@ class ThemeConfig {
           foregroundColor: Colors.white,
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
-          side: const BorderSide(color: borderSubtle, width: 1.5),
+          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
           minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
@@ -250,38 +282,38 @@ class ThemeConfig {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceCard,
-        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.8), fontFamily: fontFamily),
-        labelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily),
-        prefixIconColor: textSecondary,
-        suffixIconColor: textSecondary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: TextStyle(color: const Color(0xFF94A3B8), fontFamily: fontFamily, fontSize: 13),
+        labelStyle: TextStyle(color: const Color(0xFF64748B), fontFamily: fontFamily, fontSize: 13),
+        prefixIconColor: const Color(0xFF64748B),
+        suffixIconColor: const Color(0xFF64748B),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: borderSubtle),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: borderSubtle),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: accent, width: 1.6),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: primary, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFDC2626)),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.6),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.6),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: surface,
+        backgroundColor: const Color(0xFFF8FAFC),
         selectedColor: accentSoft,
         labelStyle: TextStyle(color: primaryDark, fontFamily: fontFamily, fontWeight: FontWeight.w600, fontSize: 12),
         secondaryLabelStyle: TextStyle(color: textSecondary, fontFamily: fontFamily, fontSize: 12),
-        side: const BorderSide(color: borderSubtle),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),

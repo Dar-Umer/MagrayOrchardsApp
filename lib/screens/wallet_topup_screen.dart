@@ -130,7 +130,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payment failed: ${response is Map ? (response['message'] ?? 'Please try again.') : (response.message ?? 'Please try again.')}'),
+          content: Text(response is Map ? (response['message'] ?? 'Payment failed. Please try again.') : (response.message ?? 'Payment failed. Please try again.')),
           backgroundColor: Colors.red,
         ),
       );
@@ -208,16 +208,15 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
                 TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Custom Amount',
                     prefixText: 'Rs. ',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
+                  height: 48,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _initiateTopUp,
                     style: ElevatedButton.styleFrom(

@@ -3,6 +3,9 @@ import '../utils/formatters.dart';
 class ServiceBookingModel {
   final int id;
   final int? serviceId;
+  final int? serviceZoneId;
+  final String? zoneName;
+  final List<dynamic>? treeBreakdown;
   final String serviceName;
   final String? serviceSlug;
   final String? serviceImage;
@@ -35,6 +38,9 @@ class ServiceBookingModel {
   ServiceBookingModel({
     required this.id,
     this.serviceId,
+    this.serviceZoneId,
+    this.zoneName,
+    this.treeBreakdown,
     required this.serviceName,
     this.serviceSlug,
     this.serviceImage,
@@ -142,6 +148,9 @@ class ServiceBookingModel {
     return ServiceBookingModel(
       id: json['id'] ?? 0,
       serviceId: json['service_id'],
+      serviceZoneId: json['service_zone_id'] is int ? json['service_zone_id'] : int.tryParse(json['service_zone_id']?.toString() ?? ''),
+      zoneName: json['zone_name']?.toString(),
+      treeBreakdown: json['tree_breakdown'] is List ? json['tree_breakdown'] as List : null,
       serviceName: service?['name'] ?? json['service_name'] ?? 'Service',
       serviceSlug: service?['slug'] ?? json['service_slug'],
       serviceImage: service?['image'] ?? json['service_image'],

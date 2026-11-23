@@ -431,7 +431,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       width: 72,
                       height: 72,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _servicePlaceholder(cs),
+                      errorWidget: (context, url, error) => _servicePlaceholder(cs),
                     )
                   : _servicePlaceholder(cs),
             ),

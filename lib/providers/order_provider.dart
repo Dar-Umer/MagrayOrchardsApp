@@ -22,7 +22,11 @@ class OrderProvider extends ChangeNotifier {
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      result = result.where((o) => o.orderNumber.toLowerCase().contains(q)).toList();
+      result = result.where((o) {
+        final matchesNumber = o.orderNumber.toLowerCase().contains(q);
+        final matchesItem = o.items.any((item) => item.name.toLowerCase().contains(q));
+        return matchesNumber || matchesItem;
+      }).toList();
     }
     return result;
   }

@@ -38,9 +38,40 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
   Widget build(BuildContext context) {
     if (widget.imageUrls.isEmpty) {
       return Container(
-        height: 300,
-        color: Colors.grey.shade100,
-        child: const Center(child: Icon(Icons.image_not_supported, size: 64, color: Colors.grey)),
+        height: 320,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.eco_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Magray Orchards Quality Input',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -112,7 +143,29 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                                 fit: BoxFit.contain,
                                 width: double.infinity,
                                 placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
-                                errorWidget: (_, __, ___) => Container(color: Colors.white, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                                errorWidget: (context, url, error) => Container(
+                                  color: const Color(0xFFF8FAFC),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(Icons.eco_rounded, size: 44, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Magray Orchards',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade400, letterSpacing: 0.5),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             );
                           },
@@ -148,7 +201,38 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                             fit: BoxFit.contain,
                             width: double.infinity,
                             placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
-                            errorWidget: (_, __, ___) => Container(color: Colors.white, child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey)),
+                            errorWidget: (context, url, error) => Container(
+                              color: const Color(0xFFF8FAFC),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(18),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.eco_rounded,
+                                        size: 46,
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Magray Orchards Quality Input',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade400,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         );
                       },

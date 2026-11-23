@@ -1180,7 +1180,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 final product = items[index];
                 return SizedBox(
                   width: 145,
-                  child: ProductCard(product: product),
+                  child: ProductCard(
+                    product: product,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProductDetailScreen(product: product),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),

@@ -5,6 +5,7 @@ import '../models/product.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../screens/checkout_screen.dart';
+import '../screens/product_detail_screen.dart';
 import '../utils/app_navigation.dart';
 import '../utils/formatters.dart';
 import 'app_network_image.dart';
@@ -92,7 +93,13 @@ class ProductCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 0,
       child: InkWell(
-        onTap: onTap,
+        onTap: onTap ??
+            () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(product: product),
+                  ),
+                ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
