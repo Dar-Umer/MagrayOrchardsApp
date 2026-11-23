@@ -74,6 +74,12 @@ class PushService {
         );
       }
       _messaging = FirebaseMessaging.instance;
+      // Enable heads-up popup banner and sound even when the app is open in foreground
+      await _messaging!.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       _configured = true;
       _initialized = true;
       debugPrint('PushService: Firebase initialized.');
