@@ -30,6 +30,7 @@ import 'screens/notifications_screen.dart';
 import 'screens/order_detail_screen.dart';
 import 'screens/subscription_screen.dart';
 import 'screens/product_detail_screen.dart';
+import 'screens/booking_detail_screen.dart';
 import 'utils/app_navigation.dart';
 
 Future<void> main() async {
@@ -115,9 +116,15 @@ void _handlePushNavigation(RemoteMessage message) {
       }
       break;
     case 'booking':
-      navigator.push(
-        MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
-      );
+      if (target.id != null) {
+        navigator.push(
+          MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: target.id)),
+        );
+      } else {
+        navigator.push(
+          MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+        );
+      }
       break;
     case 'subscription':
       navigator.push(
