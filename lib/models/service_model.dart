@@ -171,6 +171,8 @@ class ServiceModel {
   final bool isFeatured;
   final Map<String, dynamic>? travelInfo;
   final bool hasTierRates;
+  final bool isWholeDay;
+  final bool requiresTimeSlot;
   final List<ServiceTierRateModel> tierRates;
   final List<PlantTypeModel> plantTypes;
   final List<PlantAgeGroupModel> plantAgeGroups;
@@ -196,6 +198,8 @@ class ServiceModel {
     this.isFeatured = false,
     this.travelInfo,
     this.hasTierRates = false,
+    this.isWholeDay = false,
+    this.requiresTimeSlot = true,
     this.tierRates = const [],
     this.plantTypes = const [],
     this.plantAgeGroups = const [],
@@ -283,6 +287,20 @@ class ServiceModel {
 
     final hasTiers = json['has_tier_rates'] == true || rawTierRates.isNotEmpty;
 
+    final rawIsWholeDay = json['is_whole_day'] == true ||
+        (json['requires_time_slot'] == false) ||
+        _inferIsWholeDay(
+          name: json['name']?.toString() ?? '',
+          slug: json['slug']?.toString() ?? '',
+          durationEstimate: json['duration_estimate']?.toString(),
+          priceUnit: rawPriceUnit,
+          hasTierRates: hasTiers,
+        );
+
+    final rawRequiresTimeSlot = json['requires_time_slot'] != null
+        ? json['requires_time_slot'] == true
+        : !rawIsWholeDay;
+
     return ServiceModel(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
@@ -304,10 +322,32 @@ class ServiceModel {
       isFeatured: json['is_featured'] ?? false,
       travelInfo: travelInfo,
       hasTierRates: hasTiers,
+      isWholeDay: rawIsWholeDay,
+      requiresTimeSlot: rawRequiresTimeSlot,
       tierRates: rawTierRates,
       plantTypes: rawPlantTypes,
       plantAgeGroups: rawPlantAgeGroups,
     );
+  }
+
+  /// Automatically identifies whole-day/full-day services (e.g. pruning, seasonal)
+  /// where specialists work the whole day and arrival time slot selection is unnecessary.
+  static bool _inferIsWholeDay({
+    required String name,
+    required String slug,
+    String? durationEstimate,
+    String? priceUnit,
+    bool hasTierRates = false,
+  }) {
+    final lowerName = '$name $slug'.toLowerCase();
+    final lowerDuration = (durationEstimate ?? '').toLowerCase();
+    final lowerUnit = (priceUnit ?? '').toLowerCase();
+
+    if (lowerName.contains('pruning')) return true;
+    if (lowerDuration.contains('day') || lowerDuration.contains('season')) return true;
+    if (hasTierRates || lowerUnit.contains('tree')) return true;
+
+    return false;
   }
 
   /// Minimum bookable quantity (defaults to 1 if not set).
@@ -438,6 +478,8 @@ class ServiceModel {
       'image': image,
       'category_name': categoryName,
       'is_featured': isFeatured,
+      'is_whole_day': isWholeDay,
+      'requires_time_slot': requiresTimeSlot,
       'travel_info': travelInfo,
       'min_quantity': minQuantity,
       'max_quantity': maxQuantity,

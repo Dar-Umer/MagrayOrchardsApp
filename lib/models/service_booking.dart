@@ -241,12 +241,18 @@ class ServiceBookingModel {
 
   String get timeSlotLabel {
     switch (timeSlot) {
+      case 'full_day':
+      case 'whole_day':
+      case 'all_day':
+        return 'Full Day (All-Day Service)';
       case 'afternoon':
         return 'Afternoon (12 PM - 4 PM)';
       case 'evening':
         return 'Evening (4 PM - 7 PM)';
-      default:
+      case 'morning':
         return 'Morning (8 AM - 12 PM)';
+      default:
+        return 'Full Day / Flexible';
     }
   }
 }

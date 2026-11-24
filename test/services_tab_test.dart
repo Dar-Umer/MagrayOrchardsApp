@@ -214,4 +214,77 @@ void main() {
     // Button updates to Pay Online
     expect(find.textContaining('Pay Online'), findsOneWidget);
   });
+
+  testWidgets('ServiceDetailScreen displays Full-Day Service banner and hides arrival window chips for whole-day services',
+      (tester) async {
+    // Sample service with isWholeDay: true (Pruning)
+    final pruningService = ServiceModel(
+      id: 1,
+      name: 'High-Density Orchard Pruning',
+      slug: 'orchard-pruning',
+      basePrice: 50.0,
+      priceUnit: 'per_tree',
+      isWholeDay: true,
+      requiresTimeSlot: false,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ],
+        child: MaterialApp(
+          home: ServiceDetailScreen(service: pruningService),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // Verify Full-Day Service card is shown
+    expect(find.text('Full-Day Service'), findsOneWidget);
+    expect(find.text('All-Day Booking'), findsOneWidget);
+    expect(find.textContaining('Specialist crew is booked for the entire day'), findsOneWidget);
+
+    // Verify Arrival Window chips are NOT rendered
+    expect(find.text('Preferred Arrival Window'), findsNothing);
+    expect(find.text('Morning'), findsNothing);
+    expect(find.text('Afternoon'), findsNothing);
+  });
+
+  testWidgets('ServiceDetailScreen displays Preferred Arrival Window chips for time-slot services',
+      (tester) async {
+    // Sample consultation service (isWholeDay: false)
+    final consultationService = ServiceModel(
+      id: 2,
+      name: 'Orchard Visit & Consultation',
+      slug: 'orchard-visit-consultation',
+      basePrice: 200.0,
+      priceUnit: 'per_kanal',
+      isWholeDay: false,
+      requiresTimeSlot: true,
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ],
+        child: MaterialApp(
+          home: ServiceDetailScreen(service: consultationService),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // Verify Preferred Arrival Window chips are rendered
+    expect(find.text('Preferred Arrival Window'), findsOneWidget);
+    expect(find.text('Morning'), findsOneWidget);
+    expect(find.text('Afternoon'), findsOneWidget);
+    expect(find.text('Full Day'), findsOneWidget);
+
+    // Full-day banner should NOT be rendered
+    expect(find.text('All-Day Booking'), findsNothing);
+  });
 }

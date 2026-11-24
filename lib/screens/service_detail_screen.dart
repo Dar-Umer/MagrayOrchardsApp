@@ -64,6 +64,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     _quantity = _service.minQty;
     _quantityController.text = _quantity.toString();
 
+    // Default select whole-day for services that don't need arrival time slot
+    if (_service.isWholeDay) {
+      _selectedTimeSlot = 'full_day';
+    }
+
     // Default select tomorrow or today
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day + (now.hour >= 18 ? 1 : 0));
@@ -128,6 +133,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       if (mounted) {
         setState(() {
           _service = full;
+          if (_service.isWholeDay) {
+            _selectedTimeSlot = 'full_day';
+          }
           if (_service.hasTierRates && _treeInventory.isEmpty) {
             _initDefaultTreeInventory();
           }
@@ -474,7 +482,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       final booking = await ApiService.createServiceBooking(
         slug: _service.slug,
         bookingDate: _selectedDate!,
-        timeSlot: _selectedTimeSlot,
+        timeSlot: _service.isWholeDay ? 'full_day' : _selectedTimeSlot,
         latitude: _latitude,
         longitude: _longitude,
         address: _addressController.text.trim().isEmpty
@@ -895,25 +903,100 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Preferred Arrival Window',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF334155),
+            if (_service.isWholeDay) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.today_rounded,
+                        size: 20,
+                        color: Color(0xFF16A34A),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Full-Day Service',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF14532D),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'All-Day Booking',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Specialist crew is booked for the entire day. Operations commence in the morning and continue through the day. Only date selection is required.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _buildSlotChip('morning', 'Morning', '8 AM – 12 PM', cs),
-                const SizedBox(width: 8),
-                _buildSlotChip('afternoon', 'Afternoon', '12 PM – 4 PM', cs),
-                const SizedBox(width: 8),
-                _buildSlotChip('full_day', 'Full Day', 'Flexible', cs),
-              ],
-            ),
+            ] else ...[
+              const SizedBox(height: 14),
+              const Text(
+                'Preferred Arrival Window',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _buildSlotChip('morning', 'Morning', '8 AM – 12 PM', cs),
+                  const SizedBox(width: 8),
+                  _buildSlotChip('afternoon', 'Afternoon', '12 PM – 4 PM', cs),
+                  const SizedBox(width: 8),
+                  _buildSlotChip('full_day', 'Full Day', 'Flexible', cs),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
 
             // Dispatch notice (clean text, no loud emoji or icons)
@@ -927,7 +1010,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ),
               child: Text(
                 _selectedDate != null
-                    ? 'Scheduled for ${_formatFullDate(_selectedDate!)} • ${_slotLabelShort(_selectedTimeSlot)}'
+                    ? (_service.isWholeDay
+                        ? 'Scheduled for ${_formatFullDate(_selectedDate!)} • Full-Day Specialist Dispatch'
+                        : 'Scheduled for ${_formatFullDate(_selectedDate!)} • ${_slotLabelShort(_selectedTimeSlot)}')
                     : 'Select a date above for orchard specialist dispatch',
                 style: const TextStyle(
                   fontSize: 12,
@@ -993,7 +1078,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       case 'afternoon':
         return 'Afternoon dispatch (12 PM – 4 PM)';
       case 'full_day':
-        return 'Full-day flexible dispatch';
+      case 'whole_day':
+      case 'all_day':
+        return 'Full-day service';
       default:
         return 'Morning dispatch (8 AM – 12 PM)';
     }
