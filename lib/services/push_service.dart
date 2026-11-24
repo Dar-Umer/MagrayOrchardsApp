@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -74,6 +73,23 @@ class PushService {
         );
       }
       _messaging = FirebaseMessaging.instance;
+
+      // Request notification permissions with sound & alerts (required for Android 13+ & iOS)
+      try {
+        final settings = await _messaging!.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: true,
+          provisional: false,
+          sound: true,
+        );
+        debugPrint('PushService: notification permission status: ${settings.authorizationStatus}');
+      } catch (e) {
+        debugPrint('PushService: requestPermission error: $e');
+      }
+
       // Enable heads-up popup banner and sound even when the app is open in foreground
       await _messaging!.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -194,18 +210,41 @@ class PushService {
   }
 
   /// Deep-link navigation target derived from a message payload.
-  ({String? screen, int? id}) parseTarget(RemoteMessage message) {
+  ({String? screen, int? id, String? slug}) parseTarget(RemoteMessage message) {
     final data = message.data;
     String? screen = data['screen']?.toString();
+    final deepLink = data['deep_link']?.toString() ?? '';
+    final trigger = data['trigger_type']?.toString() ?? '';
+    final deepLinkType = data['deep_link_type']?.toString() ?? '';
+
     if (screen == null || screen.isEmpty) {
-      if (data['order_id'] != null) screen = 'order';
-      else if (data['booking_id'] != null) screen = 'booking';
-      else if (data['subscription_id'] != null) screen = 'subscription';
-      else if (data['type']?.toString() == 'promotional') screen = 'notifications';
+      if (deepLink.contains('/cart') || trigger == 'abandoned_cart' || deepLinkType == 'cart') {
+        screen = 'cart';
+      } else if (deepLink.contains('/product') || deepLinkType == 'product' || data['product_id'] != null) {
+        screen = 'product';
+      } else if (data['order_id'] != null) {
+        screen = 'order';
+      } else if (data['booking_id'] != null) {
+        screen = 'booking';
+      } else if (data['subscription_id'] != null) {
+        screen = 'subscription';
+      } else if (data['type']?.toString() == 'promotional') {
+        screen = 'notifications';
+      }
     }
-    final raw = data['order_id'] ?? data['booking_id'] ?? data['subscription_id'];
+
+    // Try extracting ID from deep_link if not explicitly passed
+    dynamic raw = data['product_id'] ?? data['id'] ?? data['order_id'] ?? data['booking_id'] ?? data['subscription_id'];
+    if (raw == null && deepLink.isNotEmpty) {
+      final match = RegExp(r'/(\d+)').firstMatch(deepLink);
+      if (match != null) {
+        raw = match.group(1);
+      }
+    }
     final id = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
-    return (screen: screen, id: id);
+    final slug = data['product_slug']?.toString() ?? data['slug']?.toString();
+
+    return (screen: screen, id: id, slug: slug);
   }
 }
 

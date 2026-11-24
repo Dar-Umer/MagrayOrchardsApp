@@ -141,7 +141,6 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                               child: AppNetworkImage(
                                 imageUrl: _imageUrl(widget.imageUrls[i]),
                                 fit: BoxFit.contain,
-                                width: double.infinity,
                                 placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
                                 errorWidget: (context, url, error) => Container(
                                   color: const Color(0xFFF8FAFC),
@@ -199,7 +198,6 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
                           child: AppNetworkImage(
                             imageUrl: _imageUrl(widget.imageUrls[i]),
                             fit: BoxFit.contain,
-                            width: double.infinity,
                             placeholder: (_, __) => Container(color: Colors.white, child: const Center(child: CircularProgressIndicator())),
                             errorWidget: (context, url, error) => Container(
                               color: const Color(0xFFF8FAFC),

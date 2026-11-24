@@ -29,22 +29,26 @@ class AppNetworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final defaultPlaceholder = placeholder?.call(context, imageUrl) ??
-        Container(
-          width: width,
-          height: height,
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: const Center(child: AppLoadingIndicator.small()),
-        );
+    Widget buildPlaceholder(BuildContext ctx, String url) {
+      if (placeholder != null) return placeholder!(ctx, url);
+      return Container(
+        width: width,
+        height: height,
+        color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+        child: const Center(child: AppLoadingIndicator.small()),
+      );
+    }
 
-    final defaultError = errorWidget?.call(context, imageUrl, Exception('Failed to load image')) ??
-        Container(
-          width: width,
-          height: height,
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Icon(Icons.image_not_supported_outlined,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
-        );
+    Widget buildError(BuildContext ctx, String url, Object error) {
+      if (errorWidget != null) return errorWidget!(ctx, url, error);
+      return Container(
+        width: width,
+        height: height,
+        color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+        child: Icon(Icons.image_not_supported_outlined,
+            color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+      );
+    }
 
     if (kIsWeb) {
       return Image.network(
@@ -54,14 +58,20 @@ class AppNetworkImage extends StatelessWidget {
         height: height,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return defaultPlaceholder;
+          return buildPlaceholder(context, imageUrl);
         },
-        errorBuilder: (context, error, stackTrace) => defaultError,
+        errorBuilder: (context, error, stackTrace) => buildError(context, imageUrl, error),
       );
     }
 
-    final computedMemWidth = memCacheWidth ?? (width != null ? (width! * 2).toInt() : 600);
-    final computedMemHeight = memCacheHeight ?? (height != null ? (height! * 2).toInt() : null);
+    final computedMemWidth = memCacheWidth ??
+        (width != null && width!.isFinite && !width!.isNaN
+            ? (width! * 2).toInt()
+            : null);
+    final computedMemHeight = memCacheHeight ??
+        (height != null && height!.isFinite && !height!.isNaN
+            ? (height! * 2).toInt()
+            : null);
 
     return CachedNetworkImage(
       imageUrl: imageUrl,
@@ -71,8 +81,8 @@ class AppNetworkImage extends StatelessWidget {
       memCacheWidth: computedMemWidth,
       memCacheHeight: computedMemHeight,
       fadeInDuration: fadeInDuration,
-      placeholder: (_, __) => defaultPlaceholder,
-      errorWidget: (_, __, ___) => defaultError,
+      placeholder: buildPlaceholder,
+      errorWidget: buildError,
     );
   }
 }

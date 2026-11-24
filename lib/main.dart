@@ -29,6 +29,8 @@ import 'screens/my_bookings_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/order_detail_screen.dart';
 import 'screens/subscription_screen.dart';
+import 'screens/product_detail_screen.dart';
+import 'utils/app_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +91,22 @@ void _handlePushNavigation(RemoteMessage message) {
 
   final target = PushService.instance.parseTarget(message);
   switch (target.screen) {
+    case 'cart':
+      navigator.popUntil((route) => route.isFirst);
+      AppNavigation.requestedTab.value = 3;
+      break;
+    case 'product':
+      if (target.id != null || (target.slug != null && target.slug!.isNotEmpty)) {
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(
+              productId: target.id,
+              productSlug: target.slug,
+            ),
+          ),
+        );
+      }
+      break;
     case 'order':
       if (target.id != null) {
         navigator.push(

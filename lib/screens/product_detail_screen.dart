@@ -18,8 +18,17 @@ import 'category_products_screen.dart';
 import 'checkout_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  final Product product;
-  const ProductDetailScreen({super.key, required this.product});
+  final Product? product;
+  final int? productId;
+  final String? productSlug;
+
+  const ProductDetailScreen({
+    super.key,
+    this.product,
+    this.productId,
+    this.productSlug,
+  }) : assert(product != null || productId != null || productSlug != null,
+            'At least one of product, productId, or productSlug must be provided.');
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -80,7 +89,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.dispose();
   }
 
-  Product get _p => _product ?? widget.product;
+  Product get _p => (_product ?? widget.product)!;
 
   double get _currentPrice => _selectedVariant?.price ?? _p.price;
   double? get _currentComparePrice => _selectedVariant?.comparePrice ?? _p.comparePrice;
@@ -99,17 +108,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _loadProductDetail() async {
     try {
+      final lookup = widget.productSlug ??
+          widget.productId?.toString() ??
+          (_product?.slug ?? widget.product?.slug);
+      if (lookup == null || lookup.isEmpty) return;
+
       final provider = context.read<ProductProvider>();
-      final detail = await provider.fetchProductDetail(_p.slug);
+      final detail = await provider.fetchProductDetail(lookup);
       if (detail != null && mounted) {
         setState(() {
           _product = detail;
         });
+        context.read<PersonalizationProvider>().logProductView(detail);
       }
     } catch (_) {}
   }
 
   Future<void> _checkPincode() async {
+    if (_product == null && widget.product == null) return;
     final pin = _pincodeController.text.trim();
     if (pin.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,6 +230,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_product == null && widget.product == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final cartCount = context.watch<CartProvider>().itemCount;
