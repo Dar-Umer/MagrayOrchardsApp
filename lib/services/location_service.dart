@@ -183,6 +183,27 @@ class LocationService extends ChangeNotifier {
           notifyListeners();
           return false;
         }
+
+        // Wait for user to turn on GPS in settings (up to 25s polling)
+        _isLocating = true;
+        notifyListeners();
+        bool isNowEnabled = false;
+        for (int i = 0; i < 25; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          try {
+            if (await Geolocator.isLocationServiceEnabled()) {
+              isNowEnabled = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (!isNowEnabled) {
+          _isLocating = false;
+          _lastError = 'GPS is required to detect orchard zone.';
+          notifyListeners();
+          return false;
+        }
       } else {
         _lastError = 'Location service is disabled.';
         notifyListeners();

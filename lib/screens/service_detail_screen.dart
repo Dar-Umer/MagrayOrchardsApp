@@ -48,6 +48,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   bool _isBooking = false;
   String _paymentMethod = 'visit'; // 'visit' = Pay on Visit, 'online' = Pay Online Now
+  bool _showManualLocationSearch = false;
 
   static double _asDouble(dynamic value, [double fallback = 0.0]) {
     if (value == null) return fallback;
@@ -74,6 +75,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       _longitude = loc.longitude;
       _addressController.text = loc.address ?? '';
     }
+    loc.addListener(_onLocationServiceUpdated);
 
     _loadFullService();
     _loadAvailability();
@@ -89,6 +91,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   @override
   void dispose() {
+    LocationService.instance.removeListener(_onLocationServiceUpdated);
     _orchardRequirementsController.dispose();
     _landmarkController.dispose();
     _addressController.dispose();
@@ -97,6 +100,25 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  void _onLocationServiceUpdated() {
+    if (!mounted) return;
+    final loc = LocationService.instance;
+    if (loc.hasLocation &&
+        (_latitude != loc.latitude ||
+            _longitude != loc.longitude ||
+            _addressController.text.isEmpty)) {
+      setState(() {
+        _latitude = loc.latitude;
+        _longitude = loc.longitude;
+        if (loc.address != null && loc.address!.isNotEmpty) {
+          _addressController.text = loc.address!;
+        }
+      });
+      _fetchQuote();
+      _loadAvailability();
+    }
   }
 
   Future<void> _loadFullService() async {
@@ -1007,6 +1029,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.assignment_outlined, size: 20, color: cs.primary),
                   const SizedBox(width: 10),
@@ -1022,15 +1045,30 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             color: Color(0xFF0F172A),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _service.durationEstimate != null &&
-                                  _service.durationEstimate!.isNotEmpty
-                              ? 'Estimated Duration: ${_service.durationEstimate!}'
-                              : 'Standard single-session on-site farm service',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                        ),
+                        const SizedBox(height: 4),
+                        if (_service.description?.isNotEmpty == true || _service.shortDescription?.isNotEmpty == true) ...[
+                          Text(
+                            _service.description?.isNotEmpty == true
+                                ? _service.description!
+                                : _service.shortDescription!,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.grey.shade700,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        if (_service.durationEstimate != null &&
+                            _service.durationEstimate!.isNotEmpty)
+                          Text(
+                            'Estimated Duration: ${_service.durationEstimate!}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: cs.primary,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1065,14 +1103,17 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Tree Varieties & Quantities',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: Color(0xFF0F172A),
+                const Expanded(
+                  child: Text(
+                    'Tree Varieties & Quantities',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '$_quantity Trees Total',
                   style: TextStyle(
@@ -1363,9 +1404,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   // ─── 4. STEP 3: FARM LOCATION & DISTRICT ZONE ──────────────────────────────
 
   Widget _buildLocationCard(ColorScheme cs) {
-    final zoneName = _quote?['zone_name']?.toString();
+    final zoneName = _quote?['zone_name']?.toString() ?? LocationService.instance.districtZoneName;
     final districtCode = _quote?['district_code']?.toString();
     final isFreeTravel = _quote?['is_free_travel'] == true;
+    final hasLoc = _latitude != null && _longitude != null;
 
     return Card(
       elevation: 0,
@@ -1379,85 +1421,52 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Orchard Location',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: Color(0xFF0F172A),
-              ),
+            Row(
+              children: [
+                const Text(
+                  'Orchard Location',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const Spacer(),
+                if (hasLoc)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Applied from GPS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 2),
             const Text(
-              'Technicians are dispatched based on your district zone',
+              'Specialists dispatched directly to your orchard based on district zone',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 12),
 
-            // One-Tap GPS Button
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: _gettingLocation ? null : _useGps,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-                child: _gettingLocation
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(
-                        _latitude != null ? 'Update GPS Location' : 'Detect GPS Location',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Or Manual Address Search
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _addressController,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Or search village, town or landmark',
-                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: _gettingLocation ? null : _searchAddress,
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                  ),
-                  child: const Text('Search', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-
-            // Location Verified Banner
-            if (_latitude != null && _longitude != null) ...[
-              const SizedBox(height: 10),
+            // When location is already collected, display verified details prominently
+            if (hasLoc) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1470,17 +1479,21 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          zoneName != null
-                              ? (districtCode != null ? '$districtCode • $zoneName' : zoneName)
-                              : 'Location Verified',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF166534),
+                        const Icon(Icons.location_on_rounded, size: 18, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            zoneName != null
+                                ? (districtCode != null ? '$districtCode • $zoneName' : zoneName)
+                                : 'Orchard Location Verified',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF166534),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
                         if (isFreeTravel)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1499,17 +1512,114 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       _addressController.text.isNotEmpty
                           ? _addressController.text
                           : '${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
                       style: const TextStyle(fontSize: 12, color: Color(0xFF15803D)),
                       overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() => _showManualLocationSearch = !_showManualLocationSearch),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _showManualLocationSearch ? Icons.close : Icons.edit_location_alt_outlined,
+                                  size: 14,
+                                  color: const Color(0xFF166534),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _showManualLocationSearch ? 'Close' : 'Change / Update Location',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+              ),
+            ],
+
+            // If location is NOT yet collected or user tapped "Change Location"
+            if (!hasLoc || _showManualLocationSearch) ...[
+              if (hasLoc) const SizedBox(height: 12),
+              // One-Tap GPS Button
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: _gettingLocation ? null : _useGps,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF059669),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  child: _gettingLocation
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          hasLoc ? 'Re-detect GPS Location' : 'Detect GPS Location',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Or Manual Address Search
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _addressController,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Or search village, town or landmark',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: _gettingLocation ? null : _searchAddress,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                    ),
+                    child: const Text('Search', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ],
           ],
@@ -1741,17 +1851,21 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Price Summary',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const Spacer(),
                 if (zoneName != null && zoneName.isNotEmpty)
-                  Text(
-                    '📍 $zoneName',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: cs.primary,
+                  Flexible(
+                    child: Text(
+                      '📍 $zoneName',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
                     ),
                   ),
               ],

@@ -28,11 +28,27 @@ class _ServicesTabState extends State<ServicesTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().fetchServices();
-      // Prompt GPS & detect district travel in background when opening Services (null-safe in tests)!
+      // Prompt GPS & detect district travel every time Services is opened (null-safe in tests)!
       try {
-        Provider.of<LocationService?>(context, listen: false)?.promptAndDetectLocation(context);
+        final loc = Provider.of<LocationService?>(context, listen: false) ?? LocationService.instance;
+        loc.promptAndDetectLocation(context, force: true, showGpsDialog: true);
       } catch (_) {}
     });
+  }
+
+  void _navigateToService(ServiceModel service) async {
+    final loc = Provider.of<LocationService?>(context, listen: false) ?? LocationService.instance;
+    if (!loc.hasLocation) {
+      await loc.promptAndDetectLocation(context, force: true, showGpsDialog: true);
+    }
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ServiceDetailScreen(service: service),
+        ),
+      );
+    }
   }
 
   @override
@@ -443,12 +459,7 @@ class _ServicesTabState extends State<ServicesTab> {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ServiceDetailScreen(service: service),
-            ),
-          ),
+          onTap: () => _navigateToService(service),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -568,12 +579,7 @@ class _ServicesTabState extends State<ServicesTab> {
                       ],
                     ),
                     ElevatedButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ServiceDetailScreen(service: service),
-                        ),
-                      ),
+                      onPressed: () => _navigateToService(service),
                       icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                       label: const Text('Book Service'),
                       style: ElevatedButton.styleFrom(

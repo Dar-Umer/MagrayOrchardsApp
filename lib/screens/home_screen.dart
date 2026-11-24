@@ -22,6 +22,7 @@ import '../config/api_config.dart';
 import '../models/product.dart';
 import '../models/home_section.dart';
 import '../services/shop_config.dart';
+import '../services/location_service.dart';
 import '../utils/app_navigation.dart';
 import 'login_screen.dart';
 import 'phone_input_screen.dart';
@@ -85,6 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (tab >= 0 && tab < 5) {
       setState(() => _currentIndex = tab);
       if (tab == 0) _refreshShopConfig(fetchSections: true);
+      if (tab == 2) {
+        LocationService.instance.promptAndDetectLocation(context, force: true, showGpsDialog: true);
+      }
     }
   }
 
@@ -243,6 +247,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _selectTab(int index) {
     setState(() => _currentIndex = index);
     if (index == 0) _refreshShopConfig(fetchSections: true);
+    if (index == 2) {
+      LocationService.instance.promptAndDetectLocation(context, force: true, showGpsDialog: true);
+    }
   }
 
   @override
@@ -2131,12 +2138,20 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final service = services[index];
                 return GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ServiceDetailScreen(service: service),
-                    ),
-                  ),
+                  onTap: () async {
+                    final loc = LocationService.instance;
+                    if (!loc.hasLocation) {
+                      await loc.promptAndDetectLocation(context, force: true, showGpsDialog: true);
+                    }
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ServiceDetailScreen(service: service),
+                        ),
+                      );
+                    }
+                  },
                   child: Container(
                     width: 205,
                     padding: const EdgeInsets.all(12),
