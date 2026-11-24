@@ -28,8 +28,10 @@ class _ServicesTabState extends State<ServicesTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().fetchServices();
-      // Prompt GPS & detect district travel in background when opening Services!
-      context.read<LocationService>().promptAndDetectLocation(context);
+      // Prompt GPS & detect district travel in background when opening Services (null-safe in tests)!
+      try {
+        Provider.of<LocationService?>(context, listen: false)?.promptAndDetectLocation(context);
+      } catch (_) {}
     });
   }
 
@@ -201,9 +203,19 @@ class _ServicesTabState extends State<ServicesTab> {
   }
 
   Widget _buildLocationDetectionBar(Color primary) {
-    return Consumer<LocationService>(
-      builder: (context, loc, _) {
-        if (loc.isLocating) {
+    LocationService? loc;
+    try {
+      loc = Provider.of<LocationService?>(context);
+    } catch (_) {
+      loc = null;
+    }
+    if (loc == null) return const SizedBox.shrink();
+    final activeLoc = loc;
+
+    return AnimatedBuilder(
+      animation: activeLoc,
+      builder: (context, _) {
+        if (activeLoc.isLocating) {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -234,8 +246,8 @@ class _ServicesTabState extends State<ServicesTab> {
           );
         }
 
-        if (loc.hasLocation) {
-          final zone = loc.districtZoneName != null ? ' • ${loc.districtZoneName}' : '';
+        if (activeLoc.hasLocation) {
+          final zone = activeLoc.districtZoneName != null ? ' • ${activeLoc.districtZoneName}' : '';
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
@@ -249,7 +261,7 @@ class _ServicesTabState extends State<ServicesTab> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Orchard: ${loc.address ?? "GPS detected"}$zone',
+                    'Orchard: ${activeLoc.address ?? "GPS detected"}$zone',
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
@@ -259,7 +271,7 @@ class _ServicesTabState extends State<ServicesTab> {
                   ),
                 ),
                 InkWell(
-                  onTap: () => loc.promptAndDetectLocation(context, force: true),
+                  onTap: () => activeLoc.promptAndDetectLocation(context, force: true),
                   borderRadius: BorderRadius.circular(6),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -299,7 +311,7 @@ class _ServicesTabState extends State<ServicesTab> {
                 ),
               ),
               TextButton(
-                onPressed: () => loc.promptAndDetectLocation(context, force: true),
+                onPressed: () => activeLoc.promptAndDetectLocation(context, force: true),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
