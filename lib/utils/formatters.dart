@@ -108,3 +108,43 @@ String formatPriceUnitSuffix(String? unit) {
   }
   return '/ $formatted';
 }
+
+/// Returns a user-friendly, grammatically accurate scope string for a given quantity and unit.
+///
+/// For example:
+/// - (50, 'per_tree') -> '50 Trees'
+/// - (1, 'per_tree') -> '1 Tree'
+/// - (4, 'per_kanal') -> '4 Kanals'
+/// - (1, 'per_kanal') -> '1 Kanal'
+/// - (2, 'per_acre') -> '2 Acres'
+/// - (1, 'per_visit') -> '1 Visit'
+/// - (1, 'fixed') -> 'Fixed Service'
+String formatScopeQuantity(int quantity, String? unit) {
+  if (unit == null || unit.trim().isEmpty) {
+    return quantity == 1 ? '1 unit' : '$quantity units';
+  }
+  final normalized = unit.trim().toLowerCase();
+  if (normalized.contains('tree')) {
+    return quantity == 1 ? '1 Tree' : '$quantity Trees';
+  }
+  if (normalized.contains('kanal')) {
+    return quantity == 1 ? '1 Kanal' : '$quantity Kanals';
+  }
+  if (normalized.contains('acre')) {
+    return quantity == 1 ? '1 Acre' : '$quantity Acres';
+  }
+  if (normalized.contains('visit')) {
+    return quantity == 1 ? '1 Visit' : '$quantity Visits';
+  }
+  if (normalized.contains('hour')) {
+    return quantity == 1 ? '1 Hour' : '$quantity Hours';
+  }
+  if (normalized.contains('day')) {
+    return quantity == 1 ? '1 Day' : '$quantity Days';
+  }
+  if (normalized == 'fixed') {
+    return 'Fixed Service';
+  }
+  final clean = formatPriceUnit(unit);
+  return '$quantity $clean';
+}

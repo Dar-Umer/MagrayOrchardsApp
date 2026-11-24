@@ -757,7 +757,49 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               value: b.timeSlotLabel,
               cs: cs,
             ),
-            if (b.formattedScope != null) ...[
+            if (b.detailedScopeItems.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cs.primary.withValues(alpha: 0.15)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Service Scope (${b.formattedScope ?? ''})',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ...b.detailedScopeItems.map((item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle_outline,
+                                  size: 13, color: cs.primary),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  item,
+                                  style: const TextStyle(
+                                      fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ] else if (b.formattedScope != null) ...[
               const SizedBox(height: 8),
               _infoRow(
                 icon: Icons.grass,
@@ -848,6 +890,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Orchard Requirements & Crop Details',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF166534),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      b.orchardDetails!,
+                      style: const TextStyle(
+                          fontSize: 12.5, height: 1.35, color: Color(0xFF14532D)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (hasNotes) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade200),
@@ -856,7 +929,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Orchard Requirements',
+                      'Landmark / Access Directions',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -865,21 +938,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      b.orchardDetails!,
-                      style: const TextStyle(fontSize: 12, height: 1.3),
+                      b.notes!,
+                      style: const TextStyle(
+                          fontSize: 12.5, height: 1.35, color: Color(0xFF334155)),
                     ),
                   ],
                 ),
-              ),
-            ],
-            if (hasNotes) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Notes: ${b.notes!}',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade700),
               ),
             ],
           ],

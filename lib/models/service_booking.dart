@@ -96,13 +96,7 @@ class ServiceBookingModel {
     if (value is Map) {
       final desc = value['description']?.toString();
       if (desc != null && desc.trim().isNotEmpty) return desc.trim();
-      final textParts = <String>[];
-      if (value['quantity'] != null) {
-        final q = value['quantity'];
-        final u = formatPriceUnit(value['price_unit_label']?.toString() ?? value['price_unit']?.toString());
-        textParts.add(u.isNotEmpty ? '$q $u' : '$q units');
-      }
-      if (textParts.isNotEmpty) return textParts.join(' • ');
+      return null;
     }
     return null;
   }
@@ -204,16 +198,45 @@ class ServiceBookingModel {
 
   bool get isTravel => (latitude != null && longitude != null) || travelCharge > 0;
 
-  /// User-friendly scope display e.g. "50 Per Tree" or "4 Per Kanal".
+  /// User-friendly scope display e.g. "50 Trees" or "4 Kanals".
   String? get formattedScope {
-    if (quantity != null && quantity! > 0) {
-      final unit = formatPriceUnit(priceUnit);
-      if (unit.isNotEmpty) {
-        return '$quantity $unit';
+    if (treeBreakdown != null && treeBreakdown!.isNotEmpty) {
+      final totalTrees = treeBreakdown!.fold<int>(0, (sum, item) {
+        if (item is Map) {
+          final q = item['quantity'];
+          if (q is num) return sum + q.toInt();
+          if (q != null) return sum + (int.tryParse(q.toString()) ?? 0);
+        }
+        return sum;
+      });
+      if (totalTrees > 0) {
+        return totalTrees == 1 ? '1 Tree Total' : '$totalTrees Trees Total';
       }
-      return '$quantity units';
+    }
+    if (quantity != null && quantity! > 0) {
+      return formatScopeQuantity(quantity!, priceUnit);
     }
     return null;
+  }
+
+  /// Returns detailed variety scope items if multi-tier tree breakdown is present.
+  List<String> get detailedScopeItems {
+    final list = <String>[];
+    if (treeBreakdown != null && treeBreakdown!.isNotEmpty) {
+      for (final item in treeBreakdown!) {
+        if (item is Map) {
+          final variety = item['plant_type_name']?.toString() ?? 'Tree Variety';
+          final age = item['plant_age_group_name']?.toString();
+          final q = item['quantity'] ?? 0;
+          if (age != null && age.isNotEmpty) {
+            list.add('$q × $variety ($age)');
+          } else {
+            list.add('$q × $variety');
+          }
+        }
+      }
+    }
+    return list;
   }
 
   String get timeSlotLabel {

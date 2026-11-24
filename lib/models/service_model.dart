@@ -357,7 +357,10 @@ class ServiceModel {
   String get travelChargeDescription {
     if (!isPhysical) return 'Virtual Advisory (No field visit required)';
     if (isZeroTravel) return 'Free Doorstep Travel — Promotional waiver applied';
-    return 'District-based travel rates configured per Service Zone';
+    if (isFlatTravel && flatTravelCharge != null && flatTravelCharge! > 0) {
+      return 'Flat Travel Charge: ${formatCurrency(flatTravelCharge!)}';
+    }
+    return 'District-based travel rates configured per Service Zone (Travel charges apply based on distance)';
   }
 
   /// Human-readable label for the price unit (e.g. "Per Tree", "Per Kanal", "Per Visit").

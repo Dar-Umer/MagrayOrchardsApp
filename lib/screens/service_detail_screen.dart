@@ -26,7 +26,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   bool _loadingFullService = false;
 
   DateTime? _selectedDate;
-  final _orchardDetailsController = TextEditingController();
+  String _selectedTimeSlot = 'morning'; // 'morning', 'afternoon', 'full_day'
+  final _orchardRequirementsController = TextEditingController();
+  final _landmarkController = TextEditingController();
   final _addressController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
   int _quantity = 1;
@@ -87,7 +89,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   @override
   void dispose() {
-    _orchardDetailsController.dispose();
+    _orchardRequirementsController.dispose();
+    _landmarkController.dispose();
     _addressController.dispose();
     _quantityController.dispose();
     for (final c in _inventoryControllers) {
@@ -440,7 +443,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     setState(() => _isBooking = true);
 
     try {
-      final details = _orchardDetailsController.text.trim();
+      final requirements = _orchardRequirementsController.text.trim();
+      final landmark = _landmarkController.text.trim();
       final treePayload = _service.hasTierRates && _treeInventory.isNotEmpty
           ? _treeInventory.map((i) => i.toJson()).toList()
           : null;
@@ -448,13 +452,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       final booking = await ApiService.createServiceBooking(
         slug: _service.slug,
         bookingDate: _selectedDate!,
-        timeSlot: 'full_day',
+        timeSlot: _selectedTimeSlot,
         latitude: _latitude,
         longitude: _longitude,
         address: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
-        notes: details.isEmpty ? null : details,
+        notes: landmark.isEmpty ? null : landmark,
+        orchardDetails: requirements.isEmpty ? null : requirements,
         quantity: _quantity,
         treeItems: treePayload,
         paymentMethod: _paymentMethod,
@@ -597,6 +602,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         const SizedBox(height: 14),
                       ] else if (service.isQuantityOrAreaBased) ...[
                         _buildSingleQuantityCard(cs),
+                        const SizedBox(height: 14),
+                      ] else ...[
+                        _buildFixedScopeCard(cs),
                         const SizedBox(height: 14),
                       ],
 
@@ -865,7 +873,26 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
+            const Text(
+              'Preferred Arrival Window',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildSlotChip('morning', 'Morning', '8 AM – 12 PM', cs),
+                const SizedBox(width: 8),
+                _buildSlotChip('afternoon', 'Afternoon', '12 PM – 4 PM', cs),
+                const SizedBox(width: 8),
+                _buildSlotChip('full_day', 'Full Day', 'Flexible', cs),
+              ],
+            ),
+            const SizedBox(height: 12),
 
             // Dispatch notice (clean text, no loud emoji or icons)
             Container(
@@ -878,13 +905,136 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ),
               child: Text(
                 _selectedDate != null
-                    ? 'Scheduled for ${_formatFullDate(_selectedDate!)} • Full-day orchard dispatch'
+                    ? 'Scheduled for ${_formatFullDate(_selectedDate!)} • ${_slotLabelShort(_selectedTimeSlot)}'
                     : 'Select a date above for orchard specialist dispatch',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF475569),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlotChip(String key, String label, String sub, ColorScheme cs) {
+    final isSelected = _selectedTimeSlot == key;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedTimeSlot = key),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? cs.primary.withValues(alpha: 0.08)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? cs.primary : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.6 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? cs.primary : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sub,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected
+                      ? cs.primary.withValues(alpha: 0.8)
+                      : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _slotLabelShort(String slot) {
+    switch (slot) {
+      case 'afternoon':
+        return 'Afternoon dispatch (12 PM – 4 PM)';
+      case 'full_day':
+        return 'Full-day flexible dispatch';
+      default:
+        return 'Morning dispatch (8 AM – 12 PM)';
+    }
+  }
+
+  Widget _buildFixedScopeCard(ColorScheme cs) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Service Scope',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.assignment_outlined, size: 20, color: cs.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _service.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _service.durationEstimate != null &&
+                                  _service.durationEstimate!.isNotEmpty
+                              ? 'Estimated Duration: ${_service.durationEstimate!}'
+                              : 'Standard single-session on-site farm service',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1384,7 +1534,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Payment & Instructions',
+              'Orchard Requirements & Payment',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
@@ -1393,16 +1543,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Instructions textfield
+            // Orchard Requirements textfield
             TextField(
-              controller: _orchardDetailsController,
-              maxLines: 2,
+              controller: _orchardRequirementsController,
+              maxLines: 3,
               style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
-                labelText: 'Orchard Notes / Landmark (Optional)',
-                labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                hintText: 'e.g. Near high school gate, tree row markers...',
-                hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                labelText: 'Orchard Requirements & Crop Details (Optional)',
+                labelStyle:
+                    const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                hintText:
+                    'e.g. Tree age, spray/pruning requirements, soil condition, water source...',
+                hintStyle:
+                    TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: Colors.grey.shade300),
@@ -1411,7 +1564,35 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: Colors.grey.shade300),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Landmark / Directions textfield
+            TextField(
+              controller: _landmarkController,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Landmark / Farm Access Directions (Optional)',
+                labelStyle:
+                    const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                hintText:
+                    'e.g. Near high school gate, tree row markers, access road...',
+                hintStyle:
+                    TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
             const SizedBox(height: 14),
@@ -1446,17 +1627,20 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Pay on Visit',
+                            'Pay on Visit (Cash / UPI)',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _paymentMethod == 'visit' ? cs.primary : const Color(0xFF1E293B),
+                              fontSize: 12.5,
+                              color: _paymentMethod == 'visit'
+                                  ? cs.primary
+                                  : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Cash or UPI upon visit',
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade600),
                           ),
                         ],
                       ),
@@ -1478,7 +1662,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _paymentMethod == 'online' ? cs.primary : const Color(0xFFE2E8F0),
+                          color: _paymentMethod == 'online'
+                              ? cs.primary
+                              : const Color(0xFFE2E8F0),
                           width: _paymentMethod == 'online' ? 1.8 : 1,
                         ),
                       ),
@@ -1486,17 +1672,20 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Pay Online',
+                            'Pay Online Now',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _paymentMethod == 'online' ? cs.primary : const Color(0xFF1E293B),
+                              fontSize: 12.5,
+                              color: _paymentMethod == 'online'
+                                  ? cs.primary
+                                  : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Instant via UPI / Card',
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade600),
                           ),
                         ],
                       ),
@@ -1693,7 +1882,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 Text(
                   _service.hasTierRates
                       ? '$_quantity trees • Incl. Travel'
-                      : 'Tax & Travel inclusive',
+                      : (_service.isQuantityOrAreaBased
+                          ? '${formatScopeQuantity(_quantity, _service.priceUnit)} • Incl. Travel'
+                          : 'Tax & Travel inclusive'),
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
               ],
@@ -1716,15 +1907,18 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       height: 20,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                     )
-                  : const Row(
+                  : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Book Service',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          _paymentMethod == 'online'
+                              ? 'Pay Online'
+                              : 'Confirm Booking',
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
                         ),
-                        SizedBox(width: 6),
-                        Icon(Icons.arrow_forward_rounded, size: 16),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded, size: 16),
                       ],
                     ),
             ),

@@ -340,7 +340,7 @@ void main() {
       final booking = ServiceBookingModel.fromJson(bookingJson);
       expect(booking.id, 55);
       expect(booking.quantity, 50);
-      expect(booking.formattedScope, '50 Per Tree');
+      expect(booking.formattedScope, '50 Trees');
       expect(booking.baseCharge, 2500.00);
       expect(booking.travelCharge, 212.50);
       expect(booking.totalAmount, 2712.50);
