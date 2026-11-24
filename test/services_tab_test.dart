@@ -7,6 +7,7 @@ import 'package:magray_orchards/providers/auth_provider.dart';
 import 'package:magray_orchards/providers/product_provider.dart';
 import 'package:magray_orchards/screens/tabs/services_tab.dart';
 import 'package:magray_orchards/screens/service_detail_screen.dart';
+import 'package:magray_orchards/services/analytics_service.dart';
 
 class TestProductProvider extends ProductProvider {
   final List<ServiceModel> testServices;
@@ -28,6 +29,12 @@ class TestProductProvider extends ProductProvider {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AnalyticsService.enableHeartbeat = false;
+    AnalyticsService.instance.dispose();
+  });
+
+  tearDown(() {
+    AnalyticsService.instance.dispose();
   });
 
   final sampleServices = [

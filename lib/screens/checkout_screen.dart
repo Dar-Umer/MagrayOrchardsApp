@@ -10,6 +10,7 @@ import '../services/razorpay_factory.dart';
 import '../services/razorpay_helper.dart';
 import '../services/shop_config.dart';
 import '../services/sound_service.dart';
+import '../services/analytics_service.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/app_navigation.dart';
 import '../utils/formatters.dart';
@@ -64,6 +65,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.instance.trackScreen('CheckoutScreen');
     _razorpay = createRazorpay();
     _razorpay.on('payment.success', _handlePaymentSuccess);
     _razorpay.on('payment.error', _handlePaymentError);

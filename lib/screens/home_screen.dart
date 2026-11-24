@@ -23,6 +23,7 @@ import '../models/product.dart';
 import '../models/home_section.dart';
 import '../services/shop_config.dart';
 import '../services/location_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/app_navigation.dart';
 import 'login_screen.dart';
 import 'phone_input_screen.dart';
@@ -62,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.instance.trackScreen('HomeScreen');
     _scrollController.addListener(_onScroll);
     AppNavigation.requestedTab.addListener(_handleExternalTabRequest);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -249,6 +251,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 0) _refreshShopConfig(fetchSections: true);
     if (index == 2) {
       LocationService.instance.promptAndDetectLocation(context, force: true, showGpsDialog: true);
+    }
+    const tabNames = ['HomeScreen', 'ReelsScreen', 'ServicesTab', 'CartTab', 'ProfileTab'];
+    if (index >= 0 && index < tabNames.length) {
+      AnalyticsService.instance.trackScreen(tabNames[index]);
     }
   }
 

@@ -9,6 +9,7 @@ import '../providers/product_provider.dart';
 import '../providers/wishlist_provider.dart';
 import '../providers/personalization_provider.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/app_navigation.dart';
 import '../utils/formatters.dart';
 import '../widgets/review_card.dart';
@@ -55,6 +56,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!mounted) return;
       if (_product != null) {
         context.read<PersonalizationProvider>().logProductView(_product!);
+        AnalyticsService.instance.trackScreen(
+          'ProductDetailScreen',
+          productId: _product!.id,
+          metadata: {'name': _product!.name, 'slug': _product!.slug},
+        );
       }
     });
   }
@@ -120,6 +126,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _product = detail;
         });
         context.read<PersonalizationProvider>().logProductView(detail);
+        AnalyticsService.instance.trackScreen(
+          'ProductDetailScreen',
+          productId: detail.id,
+          metadata: {'name': detail.name, 'slug': detail.slug},
+        );
       }
     } catch (_) {}
   }

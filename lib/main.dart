@@ -16,6 +16,7 @@ import 'providers/personalization_provider.dart';
 import 'services/shop_config.dart';
 import 'services/push_service.dart';
 import 'services/location_service.dart';
+import 'services/analytics_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/phone_input_screen.dart';
@@ -40,6 +41,7 @@ Future<void> main() async {
     await themeProvider.init();
   } catch (_) {}
   await ShopConfig.load();
+  await AnalyticsService.instance.init();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await PushService.instance.initialize();
   await PushService.instance.requestPermission();

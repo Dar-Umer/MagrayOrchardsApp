@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/booking_payment.dart';
 import '../services/location_service.dart';
+import '../services/analytics_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/app_quantity_input.dart';
@@ -68,6 +69,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     if (_service.isWholeDay) {
       _selectedTimeSlot = 'full_day';
     }
+
+    AnalyticsService.instance.trackScreen(
+      'ServiceDetailScreen',
+      serviceId: _service.id,
+      serviceSlug: _service.slug,
+      metadata: {'name': _service.name},
+    );
 
     // Default select tomorrow or today
     final now = DateTime.now();
