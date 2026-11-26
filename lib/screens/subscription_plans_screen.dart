@@ -38,10 +38,19 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
   }
 
   void _handlePaymentSuccess(dynamic response) {
-    final pid = response['razorpay_payment_id'] as String?;
-    final oid = response['razorpay_order_id'] as String?;
-    final sig = response['razorpay_signature'] as String?;
-    if (pid == null || oid == null || sig == null) return;
+    final map = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+    final pid = map['razorpay_payment_id']?.toString();
+    final oid = map['razorpay_order_id']?.toString();
+    final sig = map['razorpay_signature']?.toString();
+    if (pid == null || pid.isEmpty || oid == null || oid.isEmpty || sig == null || sig.isEmpty) {
+      if (mounted) {
+        setState(() => _processingPayment = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incomplete payment response. Please check your subscription status.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
 
     _verifyPayment(oid, pid, sig);
   }
@@ -178,12 +187,13 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       }
 
       final order = Map<String, dynamic>.from(data['data']);
+      final amountInRupees = num.tryParse(order['amount']?.toString() ?? '0') ?? 0;
       if (!mounted) return;
       _razorpay.open({
         'key': order['key'] ?? '',
         'order_id': order['razorpay_order_id'],
-        'amount': (order['amount'] as num).round(),
-        'currency': 'INR',
+        'amount': (amountInRupees * 100).round(),
+        'currency': order['currency']?.toString() ?? 'INR',
         'name': 'Magray Orchards',
         'description': 'Subscription: ${plan.name}',
       });

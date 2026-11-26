@@ -63,6 +63,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
       final options = {
         'key': data['key'] ?? '',
         'amount': (amount * 100).round(),
+        'currency': data['currency']?.toString() ?? 'INR',
         'name': 'Magray Orchards',
         'order_id': _razorpayOrderId,
         'description': 'Wallet Top-up',
@@ -71,6 +72,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
       _razorpay.open(options);
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e is ApiException ? e.message : 'Could not initiate payment. Please try again.'),
@@ -78,21 +80,19 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _handlePaymentSuccess(dynamic response) async {
     setState(() => _isLoading = true);
     // IdentityMap uses identical() — convert to regular map for safe key lookup
-    final data = Map<String, String>.from(response as Map);
+    final data = Map<String, dynamic>.from(response as Map);
     try {
       final wallet = context.read<WalletProvider>();
       final success = await wallet.verifyTopUp(
-        razorpayOrderId: data['razorpay_order_id'] ?? '',
-        razorpayPaymentId: data['razorpay_payment_id'] ?? '',
-        razorpaySignature: data['razorpay_signature'] ?? '',
+        razorpayOrderId: data['razorpay_order_id']?.toString() ?? '',
+        razorpayPaymentId: data['razorpay_payment_id']?.toString() ?? '',
+        razorpaySignature: data['razorpay_signature']?.toString() ?? '',
       );
 
       if (mounted) {

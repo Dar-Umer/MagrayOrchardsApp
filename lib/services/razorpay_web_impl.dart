@@ -9,11 +9,13 @@ import 'razorpay_helper.dart';
 class RazorpayPlatformImpl implements RazorpayHelper {
   void Function(dynamic)? _onSuccess;
   void Function(dynamic)? _onError;
+  void Function(dynamic)? _onExternalWallet;
 
   @override
   void on(String event, void Function(dynamic) handler) {
     if (event == 'payment.success') _onSuccess = handler;
     if (event == 'payment.error') _onError = handler;
+    if (event == 'payment.external_wallet') _onExternalWallet = handler;
   }
 
   @override
@@ -32,6 +34,10 @@ class RazorpayPlatformImpl implements RazorpayHelper {
   void clear() {
     _onSuccess = null;
     _onError = null;
+    _onExternalWallet = null;
+    js_util.setProperty(js_util.globalThis, '_rzpSuccess'.toJS, null);
+    js_util.setProperty(js_util.globalThis, '_rzpDismiss'.toJS, null);
+    js_util.setProperty(js_util.globalThis, '_rzpFailed'.toJS, null);
   }
 
   Future<void> _loadScript() async {
@@ -76,6 +82,19 @@ class RazorpayPlatformImpl implements RazorpayHelper {
       }),
     );
 
+    js_util.setProperty(
+      js_util.globalThis,
+      '_rzpFailed'.toJS,
+      js_util.allowInterop((dynamic code, dynamic desc) {
+        if (dismiss != null) {
+          dismiss({
+            'code': code?.toString() ?? 'PAYMENT_FAILED',
+            'message': desc?.toString() ?? 'Payment failed',
+          });
+        }
+      }),
+    );
+
     // Safely serialize options using standard JSON encoding to prevent script injection.
     final payload = jsonEncode({
       'key': opts['key']?.toString() ?? '',
@@ -104,6 +123,12 @@ class RazorpayPlatformImpl implements RazorpayHelper {
       ondismiss: function() { window._rzpDismiss(); }
     };
     var rzp = new Razorpay(opts);
+    rzp.on('payment.failed', function(resp) {
+      var err = (resp && resp.error) ? resp.error : {};
+      if (typeof window._rzpFailed === 'function') {
+        window._rzpFailed(err.code || 'PAYMENT_FAILED', err.description || 'Payment failed');
+      }
+    });
     rzp.open();
   } catch(e) {
     console.error('Razorpay error:', e);

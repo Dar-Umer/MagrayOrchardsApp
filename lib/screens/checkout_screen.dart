@@ -260,19 +260,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       if (_paymentMethod == 'cod') {
         await _placeCodOrder(auth, cart, addressProvider, orderProvider);
+        if (mounted) setState(() => _placingOrder = false);
       } else if (_paymentMethod == 'wallet') {
         await _placeWalletOrder(auth, cart, addressProvider, orderProvider);
+        if (mounted) setState(() => _placingOrder = false);
       } else {
         await _placeRazorpayOrder(auth, cart, addressProvider, orderProvider);
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _placingOrder = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e is ApiException ? e.message : 'We couldn\'t place your order. Please try again.'), backgroundColor: Colors.red),
         );
       }
-    } finally {
-      if (mounted) setState(() => _placingOrder = false);
     }
   }
 
@@ -405,6 +406,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         var options = {
           'key': razorpayKeyId,
           'amount': (remaining * 100).round(),
+          'currency': 'INR',
           'name': 'Magray Orchards',
           'order_id': razorpayOrderId,
           'description': 'Order ${order.orderNumber} (${formatCurrency(walletBalance)} from wallet)',
@@ -430,10 +432,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _handlePaymentSuccess(dynamic response) async {
     // IdentityMap uses identical() — convert to regular map for safe key lookup
-    final data = Map<String, String>.from(response as Map);
-    final oid = data['razorpay_order_id'] ?? '';
-    final pid = data['razorpay_payment_id'] ?? '';
-    final sig = data['razorpay_signature'] ?? '';
+    final data = Map<String, dynamic>.from(response as Map);
+    final oid = data['razorpay_order_id']?.toString() ?? '';
+    final pid = data['razorpay_payment_id']?.toString() ?? '';
+    final sig = data['razorpay_signature']?.toString() ?? '';
     try {
       await ApiService.post('/payment/razorpay/verify', body: {
         'razorpay_order_id': oid,
@@ -441,7 +443,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'razorpay_signature': sig,
       });
       if (mounted) {
-        if (!_isExpress) await context.read<CartProvider>().clearCart();
+        if (_paymentMethod == 'partial_wallet') {
+          await context.read<WalletProvider>().fetchBalance();
+        }
+        if (!_isExpress && mounted) await context.read<CartProvider>().clearCart();
         if (!mounted) return;
         final orderNum = _pendingRazorpayOrder?.orderNumber ??
             context.read<OrderProvider>().lastCreatedOrder?.orderNumber;
