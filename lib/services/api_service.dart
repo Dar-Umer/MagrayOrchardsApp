@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -9,6 +10,12 @@ import '../models/service_booking.dart';
 import '../models/service_model.dart';
 
 class ApiService {
+  static const String _tokenKey = 'auth_token';
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static final http.Client _client = http.Client();
+
   static String? _token;
   static VoidCallback? _onUnauthorized;
 
@@ -16,18 +23,64 @@ class ApiService {
     _onUnauthorized = voidCallback;
   }
 
+  static bool get _isFlutterTest {
+    try {
+      return !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static http.Client get _httpClient => _isFlutterTest ? http.Client() : _client;
+
   static Future<void> loadToken() async {
+    if (!_isFlutterTest) {
+      try {
+        final secureToken = await _secureStorage.read(key: _tokenKey);
+        if (secureToken != null && secureToken.isNotEmpty) {
+          _token = secureToken;
+          return;
+        }
+        // Migrate legacy token out of plaintext SharedPreferences if present.
+        final prefs = await SharedPreferences.getInstance();
+        final legacyToken = prefs.getString(_tokenKey);
+        if (legacyToken != null && legacyToken.isNotEmpty) {
+          _token = legacyToken;
+          await _secureStorage.write(key: _tokenKey, value: legacyToken);
+          await prefs.remove(_tokenKey);
+          return;
+        }
+        _token = null;
+        return;
+      } catch (_) {
+        // Fallback when secure storage channel is unavailable.
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('auth_token');
+    _token = prefs.getString(_tokenKey);
   }
 
   static Future<void> setToken(String? token) async {
     _token = token;
+    if (!_isFlutterTest) {
+      try {
+        if (token != null && token.isNotEmpty) {
+          await _secureStorage.write(key: _tokenKey, value: token);
+        } else {
+          await _secureStorage.delete(key: _tokenKey);
+        }
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.containsKey(_tokenKey)) {
+          await prefs.remove(_tokenKey);
+        }
+        return;
+      } catch (_) {}
+    }
     final prefs = await SharedPreferences.getInstance();
-    if (token != null) {
-      await prefs.setString('auth_token', token);
+    if (token != null && token.isNotEmpty) {
+      await prefs.setString(_tokenKey, token);
     } else {
-      await prefs.remove('auth_token');
+      await prefs.remove(_tokenKey);
     }
   }
 
@@ -61,17 +114,26 @@ class ApiService {
     return fallback;
   }
 
+  static dynamic _tryDecodeJson(String body) {
+    if (body.isEmpty) return null;
+    try {
+      return json.decode(body);
+    } on FormatException {
+      return null;
+    }
+  }
+
   static dynamic _handleResponse(http.Response response) {
+    final decoded = _tryDecodeJson(response.body);
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return null;
-      return json.decode(response.body);
+      return decoded;
     }
 
     if (response.statusCode == 401) {
       _onUnauthorized?.call();
-      final body = response.body.isNotEmpty ? json.decode(response.body) : null;
       final message = _extractMessage(
-        body,
+        decoded,
         'Your session has expired. Please log in again.',
       );
       throw ApiException(
@@ -82,9 +144,18 @@ class ApiService {
       );
     }
 
-    final body = response.body.isNotEmpty ? json.decode(response.body) : null;
+    if (response.statusCode == 429) {
+      final retryAfter = response.headers['retry-after'];
+      final fallback = (retryAfter != null && retryAfter.isNotEmpty)
+          ? 'Too many requests. Please wait ${retryAfter}s and try again.'
+          : _defaultMessage(429);
+      throw ApiException(
+        statusCode: 429,
+        message: _extractMessage(decoded, fallback),
+      );
+    }
 
-    final message = _extractMessage(body, _defaultMessage(response.statusCode));
+    final message = _extractMessage(decoded, _defaultMessage(response.statusCode));
 
     throw ApiException(
       statusCode: response.statusCode,
@@ -118,25 +189,25 @@ class ApiService {
       final response = await request().timeout(const Duration(seconds: 30));
       return _handleResponse(response);
     } on SocketException {
-      debugPrint('ApiService: SocketException');
+      if (kDebugMode) debugPrint('ApiService: SocketException');
       throw ApiException(
         statusCode: 0,
         message: 'No internet connection. Please check your network and try again.',
       );
     } on TimeoutException {
-      debugPrint('ApiService: TimeoutException');
+      if (kDebugMode) debugPrint('ApiService: TimeoutException');
       throw ApiException(
         statusCode: 0,
         message: 'Request timed out. Please try again.',
       );
     } on HandshakeException {
-      debugPrint('ApiService: HandshakeException');
+      if (kDebugMode) debugPrint('ApiService: HandshakeException');
       throw ApiException(
         statusCode: 0,
         message: 'Secure connection failed. Please try again.',
       );
     } on http.ClientException {
-      debugPrint('ApiService: ClientException');
+      if (kDebugMode) debugPrint('ApiService: ClientException');
       throw ApiException(
         statusCode: 0,
         message: 'Could not connect to the server. Please try again.',
@@ -152,12 +223,12 @@ class ApiService {
   static Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint')
         .replace(queryParameters: queryParams);
-    return _makeRequest(() => http.get(uri, headers: _headers()));
+    return _makeRequest(() => _httpClient.get(uri, headers: _headers()));
   }
 
   static Future<dynamic> post(String endpoint, {dynamic body}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    return _makeRequest(() => http.post(
+    return _makeRequest(() => _httpClient.post(
       uri,
       headers: _headers(),
       body: body != null ? json.encode(body) : null,
@@ -166,7 +237,7 @@ class ApiService {
 
   static Future<dynamic> put(String endpoint, {dynamic body}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    return _makeRequest(() => http.put(
+    return _makeRequest(() => _httpClient.put(
       uri,
       headers: _headers(),
       body: body != null ? json.encode(body) : null,
@@ -175,7 +246,7 @@ class ApiService {
 
   static Future<dynamic> patch(String endpoint, {dynamic body}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    return _makeRequest(() => http.patch(
+    return _makeRequest(() => _httpClient.patch(
       uri,
       headers: _headers(),
       body: body != null ? json.encode(body) : null,
@@ -184,7 +255,7 @@ class ApiService {
 
   static Future<dynamic> delete(String endpoint) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    return _makeRequest(() => http.delete(uri, headers: _headers()));
+    return _makeRequest(() => _httpClient.delete(uri, headers: _headers()));
   }
 
   // ─── Service bookings ─────────────────────────────────────────────────

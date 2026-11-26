@@ -64,6 +64,31 @@ class AppNetworkImage extends StatelessWidget {
       );
     }
 
+    if (memCacheWidth == null && (width == null || !width!.isFinite || width!.isNaN)) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final boundedW = (constraints.hasBoundedWidth && constraints.maxWidth.isFinite && constraints.maxWidth > 0)
+              ? (constraints.maxWidth * 2).round().clamp(1, 1200)
+              : null;
+          final boundedH = memCacheHeight ??
+              ((height != null && height!.isFinite && !height!.isNaN)
+                  ? (height! * 2).toInt()
+                  : null);
+          return CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: fit,
+            width: width,
+            height: height,
+            memCacheWidth: boundedW,
+            memCacheHeight: boundedH,
+            fadeInDuration: fadeInDuration,
+            placeholder: buildPlaceholder,
+            errorWidget: buildError,
+          );
+        },
+      );
+    }
+
     final computedMemWidth = memCacheWidth ??
         (width != null && width!.isFinite && !width!.isNaN
             ? (width! * 2).toInt()

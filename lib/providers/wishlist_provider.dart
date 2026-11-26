@@ -23,6 +23,14 @@ class WishlistProvider extends ChangeNotifier {
 
   bool isInWishlist(int productId) => _wishlistProductIds.contains(productId);
 
+  void reset() {
+    _items = [];
+    _wishlistProductIds = {};
+    _errorMessage = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> fetchWishlist() async {
     _isLoading = true;
     notifyListeners();

@@ -321,7 +321,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final status = _statusStyle(order.status);
     final firstItem = order.items.isNotEmpty ? order.items.first : null;
     final itemImage = firstItem?.image;
-    final imageUrl = itemImage != null ? '${ApiConfig.imageBaseUrl}$itemImage' : null;
+    final imageUrl = itemImage != null && itemImage.trim().isNotEmpty
+        ? ApiConfig.resolveImageUrl(itemImage)
+        : null;
 
     final isDelivered = order.status.toLowerCase() == 'delivered' || order.status.toLowerCase() == 'completed';
     final isCancelled = order.status.toLowerCase() == 'cancelled';

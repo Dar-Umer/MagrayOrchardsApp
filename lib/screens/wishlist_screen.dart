@@ -177,8 +177,8 @@ class _WishlistScreenState extends State<WishlistScreen> {
                           child: product.image != null &&
                                   product.image!.isNotEmpty
                               ? AppNetworkImage(
-                                  imageUrl:
-                                      '${ApiConfig.imageBaseUrl}${product.image}',
+                                  imageUrl: ApiConfig.resolveImageUrl(
+                                      product.image),
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) => Center(
                                     child: Icon(

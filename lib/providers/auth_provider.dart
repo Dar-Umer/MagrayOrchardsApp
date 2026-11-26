@@ -32,6 +32,16 @@ class AuthProvider extends ChangeNotifier {
   String? get otpMaskedPhone => _otpMaskedPhone;
 
   bool _isHandlingUnauthorized = false;
+  VoidCallback? _onSessionCleared;
+  Future<void> Function()? _onAuthenticated;
+
+  void setSessionCallbacks({
+    VoidCallback? onSessionCleared,
+    Future<void> Function()? onAuthenticated,
+  }) {
+    _onSessionCleared = onSessionCleared;
+    _onAuthenticated = onAuthenticated;
+  }
 
   AuthProvider() {
     ApiService.setOnUnauthorized(_handleUnauthorized);
@@ -47,6 +57,7 @@ class AuthProvider extends ChangeNotifier {
       _user = null;
       _token = null;
       await ApiService.setToken(null);
+      _onSessionCleared?.call();
       notifyListeners();
     } finally {
       _isHandlingUnauthorized = false;
@@ -61,8 +72,15 @@ class AuthProvider extends ChangeNotifier {
     if (_token != null) {
       try {
         await loadProfile();
-      } catch (e) {
+      } on AccountBlockedException {
         await logout();
+      } on ApiException catch (e) {
+        if (e.statusCode == 401 || e.statusCode == 403) {
+          await _handleUnauthorized();
+        }
+        // Preserve session token on transient offline/network errors.
+      } catch (_) {
+        // Preserve token on unexpected transient error rather than hard logging out.
       }
     }
     _isLoading = false;
@@ -123,6 +141,7 @@ class AuthProvider extends ChangeNotifier {
       await ApiService.setToken(_token);
       await loadProfile();
       _registerPushToken();
+      await _onAuthenticated?.call();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -146,6 +165,7 @@ class AuthProvider extends ChangeNotifier {
       await ApiService.setToken(_token);
       await loadProfile();
       _registerPushToken();
+      await _onAuthenticated?.call();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -172,6 +192,7 @@ class AuthProvider extends ChangeNotifier {
       await ApiService.setToken(_token);
       await loadProfile();
       _registerPushToken();
+      await _onAuthenticated?.call();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -240,6 +261,7 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _token = null;
     await ApiService.setToken(null);
+    _onSessionCleared?.call();
     notifyListeners();
   }
 

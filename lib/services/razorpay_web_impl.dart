@@ -18,7 +18,14 @@ class RazorpayPlatformImpl implements RazorpayHelper {
 
   @override
   void open(Map<String, dynamic> options) {
-    _loadScript().then((_) => _doOpen(options));
+    _loadScript()
+        .then((_) => _doOpen(options))
+        .catchError((Object e) {
+      _onError?.call({
+        'code': 'SCRIPT_LOAD_FAILED',
+        'message': e.toString(),
+      });
+    });
   }
 
   @override
@@ -100,6 +107,9 @@ class RazorpayPlatformImpl implements RazorpayHelper {
     rzp.open();
   } catch(e) {
     console.error('Razorpay error:', e);
+    if (typeof window._rzpDismiss === 'function') {
+      window._rzpDismiss();
+    }
   }
 })();
 ''';

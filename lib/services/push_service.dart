@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -55,7 +56,7 @@ class PushService {
     if (apiKey.isEmpty || appId.isEmpty || projectId.isEmpty) {
       _initialized = true;
       _configured = false;
-      debugPrint('PushService: Firebase not configured — push disabled.');
+      if (kDebugMode) debugPrint('PushService: Firebase not configured — push disabled.');
       return;
     }
 
@@ -85,9 +86,9 @@ class PushService {
           provisional: false,
           sound: true,
         );
-        debugPrint('PushService: notification permission status: ${settings.authorizationStatus}');
+        if (kDebugMode) debugPrint('PushService: notification permission status: ${settings.authorizationStatus}');
       } catch (e) {
-        debugPrint('PushService: requestPermission error: $e');
+        if (kDebugMode) debugPrint('PushService: requestPermission error: $e');
       }
 
       // Enable heads-up popup banner and sound even when the app is open in foreground
@@ -98,11 +99,11 @@ class PushService {
       );
       _configured = true;
       _initialized = true;
-      debugPrint('PushService: Firebase initialized.');
+      if (kDebugMode) debugPrint('PushService: Firebase initialized.');
     } catch (e) {
       _initialized = true;
       _configured = false;
-      debugPrint('PushService: Firebase init failed: $e');
+      if (kDebugMode) debugPrint('PushService: Firebase init failed: $e');
     }
   }
 
@@ -118,10 +119,10 @@ class PushService {
       if (token != _pendingToken) {
         await ApiService.registerDeviceToken(token, deviceType: deviceType);
         _pendingToken = token;
-        debugPrint('PushService: token registered (${token.length} chars).');
+        if (kDebugMode) debugPrint('PushService: token registered (${token.length} chars).');
       }
     } catch (e) {
-      debugPrint('PushService: token registration failed: $e');
+      if (kDebugMode) debugPrint('PushService: token registration failed: $e');
     }
   }
 
@@ -134,7 +135,7 @@ class PushService {
     try {
       await ApiService.unregisterDeviceToken(token);
     } catch (e) {
-      debugPrint('PushService: token unregister failed: $e');
+      if (kDebugMode) debugPrint('PushService: token unregister failed: $e');
     }
   }
 
@@ -146,7 +147,7 @@ class PushService {
       _token = newToken;
       if (auth.isLoggedIn) {
         ApiService.registerDeviceToken(newToken).catchError((e) {
-          debugPrint('PushService: token refresh register failed: $e');
+          if (kDebugMode) debugPrint('PushService: token refresh register failed: $e');
         });
       }
     });
@@ -185,7 +186,7 @@ class PushService {
       );
       return settings.authorizationStatus == AuthorizationStatus.authorized;
     } catch (e) {
-      debugPrint('PushService: permission request failed: $e');
+      if (kDebugMode) debugPrint('PushService: permission request failed: $e');
       return false;
     }
   }

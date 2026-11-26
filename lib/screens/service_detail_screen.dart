@@ -290,11 +290,35 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       _toast('No dates are available for booking right now. Please check back later.');
       return;
     }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final last = today.add(const Duration(days: 30));
+
+    DateTime initial = _selectedDate ?? today;
+    if (initial.isBefore(today)) initial = today;
+    if (initial.isAfter(last)) initial = last;
+
+    if (!_isDateOpen(initial)) {
+      DateTime? firstOpen;
+      for (int i = 0; i <= 30; i++) {
+        final candidate = today.add(Duration(days: i));
+        if (_isDateOpen(candidate)) {
+          firstOpen = candidate;
+          break;
+        }
+      }
+      if (firstOpen == null) {
+        _toast('No dates are available for booking right now. Please check back later.');
+        return;
+      }
+      initial = firstOpen;
+    }
+
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      initialDate: initial,
+      firstDate: today,
+      lastDate: last,
       selectableDayPredicate: _isDateOpen,
     );
     if (date != null && mounted) {
@@ -691,7 +715,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               color: const Color(0xFFF1F5F9),
               child: service.image != null
                   ? AppNetworkImage(
-                      imageUrl: '${ApiConfig.imageBaseUrl}${service.image}',
+                      imageUrl: ApiConfig.resolveImageUrl(service.image),
                       fit: BoxFit.cover,
                       errorWidget: (context, url, error) => Icon(
                         Icons.eco_rounded,

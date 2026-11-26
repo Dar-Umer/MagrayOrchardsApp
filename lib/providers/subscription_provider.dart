@@ -20,6 +20,16 @@ class SubscriptionProvider extends ChangeNotifier {
   Map<String, dynamic>? get lastSubscription => _lastSubscription;
   bool get isLoading => _isLoading;
 
+  void reset() {
+    _plans = [];
+    _paidContents = [];
+    _currentSubscription = null;
+    _lastSubscription = null;
+    _errorMessage = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> loadPlans() async {
     _errorMessage = null;
     _isLoading = true;

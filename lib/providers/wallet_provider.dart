@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/wallet.dart';
 import '../services/api_service.dart';
@@ -48,7 +49,7 @@ class WalletProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e, s) {
       _isLoading = false;
-      debugPrint('WalletProvider.fetchBalance error: $e\n$s');
+      if (kDebugMode) debugPrint('WalletProvider.fetchBalance error: $e\n$s');
       _errorMessage = e is ApiException ? e.message : 'Could not load wallet balance.';
       notifyListeners();
     }
@@ -81,7 +82,7 @@ class WalletProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e, s) {
       _isLoadingTransactions = false;
-      debugPrint('WalletProvider.fetchTransactions error: $e\n$s');
+      if (kDebugMode) debugPrint('WalletProvider.fetchTransactions error: $e\n$s');
       _errorMessage = e is ApiException ? e.message : 'Could not load transactions.';
       notifyListeners();
     }

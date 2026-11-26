@@ -29,10 +29,7 @@ class _ProductImageGalleryState extends State<ProductImageGallery> {
     super.dispose();
   }
 
-  String _imageUrl(String path) {
-    if (path.startsWith('http')) return path;
-    return '${ApiConfig.imageBaseUrl}$path';
-  }
+  String _imageUrl(String path) => ApiConfig.resolveImageUrl(path);
 
   @override
   Widget build(BuildContext context) {

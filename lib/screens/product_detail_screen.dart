@@ -106,11 +106,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return ((_currentComparePrice! - _currentPrice) / _currentComparePrice! * 100).round();
   }
 
-  String _imageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    return '${ApiConfig.imageBaseUrl}$path';
-  }
+  String _imageUrl(String? path) => ApiConfig.resolveImageUrl(path);
 
   Future<void> _loadProductDetail() async {
     try {

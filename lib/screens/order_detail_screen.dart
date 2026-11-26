@@ -724,7 +724,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             itemBuilder: (context, index) {
               final item = _o.items[index];
-              final imageUrl = item.image != null ? '${ApiConfig.imageBaseUrl}${item.image}' : null;
+              final imageUrl = item.image != null && item.image!.trim().isNotEmpty
+                  ? ApiConfig.resolveImageUrl(item.image)
+                  : null;
 
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.center,

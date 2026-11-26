@@ -177,13 +177,19 @@ class _ReelViewState extends State<_ReelView> {
   YoutubePlayerController? _youtubeController;
   bool _muted = false;
 
+  bool _initialized = false;
+
   @override
   void initState() {
     super.initState();
-    _initVideo();
+    if (widget.isActive) {
+      _initVideo();
+    }
   }
 
   Future<void> _initVideo() async {
+    if (_initialized) return;
+    _initialized = true;
     if (widget.reel.isYouTube) {
       final videoId = _extractYoutubeId(widget.reel.videoUrl ?? '');
       if (videoId != null) {
@@ -248,8 +254,12 @@ class _ReelViewState extends State<_ReelView> {
       _youtubeController?.pauseVideo();
       _chewieController?.pause();
     } else if (!oldWidget.isActive && widget.isActive) {
-      _youtubeController?.playVideo();
-      _chewieController?.play();
+      if (!_initialized) {
+        _initVideo();
+      } else {
+        _youtubeController?.playVideo();
+        _chewieController?.play();
+      }
     }
   }
 

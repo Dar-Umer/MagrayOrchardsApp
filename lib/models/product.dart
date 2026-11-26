@@ -78,16 +78,29 @@ class Product {
       categoryId = json['category_id'];
     }
 
-    String? imageUrl = json['image'];
-    if (imageUrl == null && json['images'] is List && (json['images'] as List).isNotEmpty) {
-      imageUrl = json['images'][0]['image_path'] ?? json['images'][0]['image'];
-    }
-
     List<ProductImage> images = [];
     if (json['images'] is List) {
       images = (json['images'] as List)
           .map((e) => ProductImage.fromJson(e as Map<String, dynamic>))
           .toList();
+      images.sort((a, b) {
+        if (a.isPrimary != b.isPrimary) return a.isPrimary ? -1 : 1;
+        return a.sortOrder.compareTo(b.sortOrder);
+      });
+    }
+
+    String? imageUrl =
+        (json['image'] is String && (json['image'] as String).trim().isNotEmpty)
+            ? (json['image'] as String).trim()
+            : null;
+    if (imageUrl == null && images.isNotEmpty) {
+      final primaryImg = images.firstWhere(
+        (e) => e.isPrimary && e.imagePath.trim().isNotEmpty,
+        orElse: () => images.first,
+      );
+      if (primaryImg.imagePath.trim().isNotEmpty) {
+        imageUrl = primaryImg.imagePath.trim();
+      }
     }
 
     List<ProductVariant> variants = [];

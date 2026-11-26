@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/home_section.dart';
 import 'api_service.dart';
 
@@ -165,8 +167,24 @@ class ShopConfig {
     return fallback;
   }
 
+  static const String _cacheKey = 'cached_shop_config_v1';
+
   @visibleForTesting
   static Future<bool> Function()? mockLoaderForTesting;
+
+  static Future<bool> loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || raw.isEmpty) return false;
+      final decoded = json.decode(raw);
+      if (decoded is! Map) return false;
+      _applyData(decoded);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   static Future<bool> load({bool rethrowErrors = false}) async {
     if (mockLoaderForTesting != null) {
@@ -189,64 +207,73 @@ class ShopConfig {
       final data = response['data'] ?? response;
       if (data is! Map) return false;
 
-      _siteName = _strNonEmpty(data['site_name'], _siteName);
-      _logoUrl = _str(data['logo_url']);
-      _taxRate = _double(data['tax_rate'], 18);
-      _gstEnabled = _bool(data['gst_enabled'], true);
-      _gstin = _str(data['gstin']);
-      _maxOrderAmount = _double(data['max_order_amount'], 0);
-      _announcementMessage = _str(data['announcement_message'], _announcementMessage);
-      _announcementMessageShort =
-          _str(data['announcement_message_short'], _announcementMessageShort);
-      _freeDeliveryThreshold = _double(data['free_delivery_threshold'], 999);
-      _otpVerificationEnabled = _bool(data['otp_verification_enabled'], true);
-      _promoBannerEnabled = _bool(data['promo_banner_enabled'], true);
-      _promoBannerTitle = _str(data['promo_banner_title'], _promoBannerTitle);
-      _promoBannerSubtitle = _str(data['promo_banner_subtitle'], _promoBannerSubtitle);
-      final colorHex = _str(data['promo_banner_color']);
-      if (colorHex.isNotEmpty) {
-        final parsed = _parseHexColor(colorHex);
-        if (parsed != null) _promoBannerColor = parsed;
-      }
-      _promoBannerLink = _str(data['promo_banner_link']);
+      _applyData(data);
 
-      _androidLatestVersion = _strNonEmpty(
-          data['mobile_app_android_latest_version'], _androidLatestVersion);
-      _androidMinVersion = _strNonEmpty(
-          data['mobile_app_android_min_version'], _androidMinVersion);
-      _androidStoreUrl = _str(data['mobile_app_android_store_url']);
-      _iosLatestVersion = _strNonEmpty(
-          data['mobile_app_ios_latest_version'], _iosLatestVersion);
-      _iosMinVersion =
-          _strNonEmpty(data['mobile_app_ios_min_version'], _iosMinVersion);
-      _iosStoreUrl = _str(data['mobile_app_ios_store_url']);
-      _updateNotes = _str(data['mobile_app_update_notes']);
-      _maintenanceEnabled = _bool(data['mobile_app_maintenance_enabled'], false);
-      _maintenanceMessage = _strNonEmpty(
-          data['mobile_app_maintenance_message'], _maintenanceMessage);
-      _maintenanceUntil = _str(data['mobile_app_maintenance_until']);
-
-      final firebase = data['firebase'];
-      if (firebase is Map) {
-        _firebaseApiKey = _str(firebase['api_key']);
-        _firebaseAppId = _str(firebase['app_id']);
-        _firebaseMessagingSenderId = _str(firebase['messaging_sender_id']);
-        _firebaseProjectId = _str(firebase['project_id']);
-        _firebaseAuthDomain = _str(firebase['auth_domain']);
-        _firebaseStorageBucket = _str(firebase['storage_bucket']);
-      }
-
-      final layout = HomeLayout.fromJson(data['home_layout']);
-      _homeSections = layout.sections;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_cacheKey, json.encode(data));
+      } catch (_) {}
 
       // Notify listeners (home screen, checkout, etc.) that config changed.
       revision.value++;
       return true;
     } catch (e) {
-      debugPrint('ShopConfig.load failed: $e');
+      if (kDebugMode) debugPrint('ShopConfig.load failed: $e');
       if (rethrowErrors) rethrow;
       return false;
     }
+  }
+
+  static void _applyData(Map data) {
+    _siteName = _strNonEmpty(data['site_name'], _siteName);
+    _logoUrl = _str(data['logo_url']);
+    _taxRate = _double(data['tax_rate'], 18);
+    _gstEnabled = _bool(data['gst_enabled'], true);
+    _gstin = _str(data['gstin']);
+    _maxOrderAmount = _double(data['max_order_amount'], 0);
+    _announcementMessage = _str(data['announcement_message'], _announcementMessage);
+    _announcementMessageShort =
+        _str(data['announcement_message_short'], _announcementMessageShort);
+    _freeDeliveryThreshold = _double(data['free_delivery_threshold'], 999);
+    _otpVerificationEnabled = _bool(data['otp_verification_enabled'], true);
+    _promoBannerEnabled = _bool(data['promo_banner_enabled'], true);
+    _promoBannerTitle = _str(data['promo_banner_title'], _promoBannerTitle);
+    _promoBannerSubtitle = _str(data['promo_banner_subtitle'], _promoBannerSubtitle);
+    final colorHex = _str(data['promo_banner_color']);
+    if (colorHex.isNotEmpty) {
+      final parsed = _parseHexColor(colorHex);
+      if (parsed != null) _promoBannerColor = parsed;
+    }
+    _promoBannerLink = _str(data['promo_banner_link']);
+
+    _androidLatestVersion = _strNonEmpty(
+        data['mobile_app_android_latest_version'], _androidLatestVersion);
+    _androidMinVersion = _strNonEmpty(
+        data['mobile_app_android_min_version'], _androidMinVersion);
+    _androidStoreUrl = _str(data['mobile_app_android_store_url']);
+    _iosLatestVersion = _strNonEmpty(
+        data['mobile_app_ios_latest_version'], _iosLatestVersion);
+    _iosMinVersion =
+        _strNonEmpty(data['mobile_app_ios_min_version'], _iosMinVersion);
+    _iosStoreUrl = _str(data['mobile_app_ios_store_url']);
+    _updateNotes = _str(data['mobile_app_update_notes']);
+    _maintenanceEnabled = _bool(data['mobile_app_maintenance_enabled'], false);
+    _maintenanceMessage = _strNonEmpty(
+        data['mobile_app_maintenance_message'], _maintenanceMessage);
+    _maintenanceUntil = _str(data['mobile_app_maintenance_until']);
+
+    final firebase = data['firebase'];
+    if (firebase is Map) {
+      _firebaseApiKey = _str(firebase['api_key']);
+      _firebaseAppId = _str(firebase['app_id']);
+      _firebaseMessagingSenderId = _str(firebase['messaging_sender_id']);
+      _firebaseProjectId = _str(firebase['project_id']);
+      _firebaseAuthDomain = _str(firebase['auth_domain']);
+      _firebaseStorageBucket = _str(firebase['storage_bucket']);
+    }
+
+    final layout = HomeLayout.fromJson(data['home_layout']);
+    _homeSections = layout.sections;
   }
 
   @visibleForTesting

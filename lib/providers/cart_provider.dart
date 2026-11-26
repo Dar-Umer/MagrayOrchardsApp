@@ -184,12 +184,19 @@ class CartProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> toOrderItems() => itemsToOrderPayload(_items);
 
+  void reset() {
+    _items.clear();
+    _errorMessage = null;
+    _persistLocal();
+    notifyListeners();
+  }
+
   Future<void> syncWithServer() async {
     if (!isLoggedIn) return;
     try {
       final response = await ApiService.get('/cart');
       final data = response['data'];
-      if (data is List && data.isNotEmpty) {
+      if (data is List) {
         _items.clear();
         for (final item in data) {
           final productData = item['product'];
@@ -201,7 +208,7 @@ class CartProvider extends ChangeNotifier {
                   ? ProductVariant.fromJson(Map<String, dynamic>.from(variantData))
                   : null,
               quantity: item['quantity'] ?? 1,
-              serverId: item['id'],
+              serverId: item['id']?.toString(),
             ));
           }
         }
@@ -211,6 +218,26 @@ class CartProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e is ApiException ? e.message : 'Could not sync cart with server.';
     }
+  }
+
+  /// Pushes any local guest cart items onto the authenticated server cart, then reconciles.
+  Future<void> pushLocalToServerAndSync() async {
+    if (!isLoggedIn) return;
+    if (_items.isEmpty) {
+      await syncWithServer();
+      return;
+    }
+    final guestOnlyItems = _items.where((i) => i.serverId == null).toList();
+    for (final item in guestOnlyItems) {
+      try {
+        await ApiService.post('/cart', body: {
+          'product_id': item.product.id,
+          if (item.variant != null) 'variant_id': item.variant!.id,
+          'quantity': item.quantity,
+        });
+      } catch (_) {}
+    }
+    await syncWithServer();
   }
 
   Future<void> _syncAddToServer(int productId, int quantity, {int? variantId}) async {

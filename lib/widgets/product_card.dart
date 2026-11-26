@@ -111,9 +111,9 @@ class ProductCard extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-                    child: product.image != null
+                    child: product.image != null && product.image!.trim().isNotEmpty
                         ? AppNetworkImage(
-                            imageUrl: '${ApiConfig.imageBaseUrl}${product.image}',
+                            imageUrl: ApiConfig.resolveImageUrl(product.image),
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Center(
                               child: Icon(Icons.eco, size: 40, color: primary),

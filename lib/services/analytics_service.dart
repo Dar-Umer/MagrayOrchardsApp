@@ -2,17 +2,20 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'location_service.dart';
 
-class AnalyticsService {
+class AnalyticsService with WidgetsBindingObserver {
   AnalyticsService._();
   static final AnalyticsService instance = AnalyticsService._();
 
   static bool enableHeartbeat = true;
   static const String _sessionKey = 'analytics_session_id';
   String? _sessionId;
+  String _appVersion = '1.0.6';
   Timer? _heartbeatTimer;
 
   String _currentScreen = 'HomeScreen';
@@ -20,6 +23,7 @@ class AnalyticsService {
   int? _currentServiceId;
   String? _currentServiceSlug;
   bool _isInitialized = false;
+  bool _isForeground = true;
 
   String get sessionId => _sessionId ?? 'guest-session';
   String get currentScreen => _currentScreen;
@@ -29,6 +33,17 @@ class AnalyticsService {
   Future<void> init() async {
     if (_isInitialized) return;
     _isInitialized = true;
+
+    try {
+      WidgetsBinding.instance.addObserver(this);
+    } catch (_) {}
+
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.version.isNotEmpty) {
+        _appVersion = info.version;
+      }
+    } catch (_) {}
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -46,15 +61,31 @@ class AnalyticsService {
     _startHeartbeat();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _isForeground = true;
+      _startHeartbeat();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _isForeground = false;
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+    }
+  }
+
   void _startHeartbeat() {
-    if (!enableHeartbeat) return;
+    if (!enableHeartbeat || !_isForeground) return;
     try {
       if (Platform.environment.containsKey('FLUTTER_TEST')) return;
     } catch (_) {}
 
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _sendPing(isHeartbeat: true);
+      if (_isForeground) {
+        _sendPing(isHeartbeat: true);
+      }
     });
   }
 
@@ -129,7 +160,7 @@ class AnalyticsService {
       'screen_name': targetScreen,
       'event_type': eventType ?? (isHeartbeat ? 'heartbeat' : 'screen_view'),
       'device_type': deviceType,
-      'app_version': '1.0.0',
+      'app_version': _appVersion,
       if (targetProduct != null) 'product_id': targetProduct,
       if (targetService != null) 'service_id': targetService,
       if (targetSlug != null) 'service_slug': targetSlug,
@@ -148,6 +179,10 @@ class AnalyticsService {
   }
 
   void dispose() {
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
     _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
   }
 }

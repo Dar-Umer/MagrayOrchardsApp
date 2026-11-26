@@ -25,6 +25,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     _razorpay = createRazorpay();
     _razorpay.on('payment.success', _handlePaymentSuccess);
     _razorpay.on('payment.error', _handlePaymentError);
+    _razorpay.on('payment.external_wallet', _handleExternalWallet);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SubscriptionProvider>().loadPlans();
     });
@@ -49,8 +50,17 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     if (!mounted) return;
     setState(() => _processingPayment = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment failed: ${error is Map ? error['reason'] ?? 'Unknown error' : error}'),
+      SnackBar(content: Text('Payment failed: ${error is Map ? error['reason'] ?? error['message'] ?? 'Unknown error' : error}'),
           backgroundColor: Colors.red),
+    );
+  }
+
+  void _handleExternalWallet(dynamic response) {
+    if (!mounted) return;
+    setState(() => _processingPayment = false);
+    final name = response is Map ? (response['wallet_name'] ?? 'External Wallet') : 'External Wallet';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Redirected to $name.')),
     );
   }
 
@@ -172,7 +182,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       _razorpay.open({
         'key': order['key'] ?? '',
         'order_id': order['razorpay_order_id'],
-        'amount': (order['amount'] as num).toInt(),
+        'amount': (order['amount'] as num).round(),
         'currency': 'INR',
         'name': 'Magray Orchards',
         'description': 'Subscription: ${plan.name}',

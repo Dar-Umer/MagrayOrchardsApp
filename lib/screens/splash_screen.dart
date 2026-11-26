@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -204,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen> {
       });
       return;
     } catch (e) {
-      debugPrint('User active check warning: $e');
+      if (kDebugMode) debugPrint('User active check warning: $e');
     }
 
     // ── 5. Completion & Initialization ───────────────────────────────────────

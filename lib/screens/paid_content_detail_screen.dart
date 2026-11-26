@@ -22,7 +22,7 @@ class _PaidContentDetailScreenState extends State<PaidContentDetailScreen> {
 
   Future<void> _loadContent() async {
     try {
-      final response = await ApiService.get('paid-contents/${widget.slug}');
+      final response = await ApiService.get('/paid-contents/${widget.slug}');
       setState(() {
         _content = PaidContent.fromJson(response['data']);
         _isLoading = false;

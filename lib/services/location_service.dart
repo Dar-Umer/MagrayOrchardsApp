@@ -20,6 +20,7 @@ class LocationService extends ChangeNotifier {
   bool _isLocating = false;
   String? _lastError;
   bool _hasPromptedThisSession = false;
+  Future<bool>? _inFlightDetect;
 
   double? get latitude => _latitude;
   double? get longitude => _longitude;
@@ -107,6 +108,26 @@ class LocationService extends ChangeNotifier {
 
   /// Prompts GPS turn-on and detects device coordinates, reverse-geocoding the orchard zone.
   Future<bool> promptAndDetectLocation(
+    BuildContext context, {
+    bool force = false,
+    bool showGpsDialog = true,
+  }) {
+    if (_inFlightDetect != null) return _inFlightDetect!;
+    final future = _doPromptAndDetectLocation(
+      context,
+      force: force,
+      showGpsDialog: showGpsDialog,
+    );
+    _inFlightDetect = future;
+    future.whenComplete(() {
+      if (_inFlightDetect == future) {
+        _inFlightDetect = null;
+      }
+    });
+    return future;
+  }
+
+  Future<bool> _doPromptAndDetectLocation(
     BuildContext context, {
     bool force = false,
     bool showGpsDialog = true,

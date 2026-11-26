@@ -35,5 +35,5 @@ class ProductImage {
     };
   }
 
-  String get url => '${ApiConfig.imageBaseUrl}$imagePath';
+  String get url => ApiConfig.resolveImageUrl(imagePath);
 }

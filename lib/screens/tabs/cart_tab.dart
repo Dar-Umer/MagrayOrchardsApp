@@ -269,7 +269,7 @@ class _CartTabState extends State<CartTab> {
                                       borderRadius: BorderRadius.circular(8),
                                       child: AppNetworkImage(
                                         imageUrl:
-                                            '${ApiConfig.imageBaseUrl}${item.product.image}',
+                                            ApiConfig.resolveImageUrl(item.product.image),
                                         fit: BoxFit.cover,
                                         errorWidget: (_, _, _) =>
                                             Icon(Icons.eco, color: primary),

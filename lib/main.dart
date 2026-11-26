@@ -37,10 +37,13 @@ import 'utils/app_navigation.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final themeProvider = ThemeProvider();
+  await Future.wait([
+    themeProvider.init().catchError((_) {}),
+    ShopConfig.loadFromCache().catchError((_) => false),
+  ]);
   try {
-    await themeProvider.init();
+    await ShopConfig.load().timeout(const Duration(seconds: 3));
   } catch (_) {}
-  await ShopConfig.load();
   await AnalyticsService.instance.init();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await PushService.instance.initialize();
@@ -167,29 +170,71 @@ class MagrayOrchardsApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PersonalizationProvider()),
         ChangeNotifierProvider.value(value: LocationService.instance),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          return MaterialApp(
-            title: 'Magray Orchards',
-            debugShowCheckedModeBanner: false,
-            navigatorKey: appNavigatorKey,
-            theme: themeProvider.themeData,
-            home: const SplashScreen(),
-            routes: {
-              '/home': (_) => const HomeScreen(),
-              '/login': (_) => const PhoneInputScreen(),
-              '/otp-verify': (_) => const OtpVerifyScreen(),
-              '/orders': (_) => const OrdersScreen(),
-              '/addresses': (_) => const AddressScreen(),
-              '/wishlist': (_) => const WishlistScreen(),
-              '/checkout': (_) => const CheckoutScreen(),
-              '/wallet': (_) => const WalletScreen(),
-              '/bookings': (_) => const MyBookingsScreen(),
-              '/notifications': (_) => const NotificationsScreen(),
-            },
-          );
-        },
+      child: _SessionCoordinator(
+        child: Consumer<ThemeProvider>(
+          builder: (context, themeProvider, _) {
+            return MaterialApp(
+              title: 'Magray Orchards',
+              debugShowCheckedModeBanner: false,
+              navigatorKey: appNavigatorKey,
+              theme: themeProvider.themeData,
+              home: const SplashScreen(),
+              routes: {
+                '/home': (_) => const HomeScreen(),
+                '/login': (_) => const PhoneInputScreen(),
+                '/otp-verify': (_) => const OtpVerifyScreen(),
+                '/orders': (_) => const OrdersScreen(),
+                '/addresses': (_) => const AddressScreen(),
+                '/wishlist': (_) => const WishlistScreen(),
+                '/checkout': (_) => const CheckoutScreen(),
+                '/wallet': (_) => const WalletScreen(),
+                '/bookings': (_) => const MyBookingsScreen(),
+                '/notifications': (_) => const NotificationsScreen(),
+              },
+            );
+          },
+        ),
       ),
     );
   }
+}
+
+class _SessionCoordinator extends StatefulWidget {
+  final Widget child;
+  const _SessionCoordinator({required this.child});
+
+  @override
+  State<_SessionCoordinator> createState() => _SessionCoordinatorState();
+}
+
+class _SessionCoordinatorState extends State<_SessionCoordinator> {
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthProvider>();
+    auth.setSessionCallbacks(
+      onSessionCleared: () {
+        if (!mounted) return;
+        context.read<CartProvider>().reset();
+        context.read<AddressProvider>().reset();
+        context.read<OrderProvider>().reset();
+        context.read<WalletProvider>().reset();
+        context.read<WishlistProvider>().reset();
+        context.read<SubscriptionProvider>().reset();
+        context.read<NotificationProvider>().reset();
+        context.read<PersonalizationProvider>().reset();
+      },
+      onAuthenticated: () async {
+        if (!mounted) return;
+        await Future.wait([
+          context.read<CartProvider>().pushLocalToServerAndSync(),
+          context.read<WishlistProvider>().fetchWishlist(),
+          context.read<NotificationProvider>().loadUnreadCount(),
+        ]);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

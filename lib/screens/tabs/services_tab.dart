@@ -485,7 +485,7 @@ class _ServicesTabState extends State<ServicesTab> {
                               borderRadius: BorderRadius.circular(11),
                               child: AppNetworkImage(
                                 imageUrl:
-                                    '${ApiConfig.imageBaseUrl}${service.image}',
+                                    ApiConfig.resolveImageUrl(service.image),
                                 fit: BoxFit.cover,
                                 errorWidget: (errContext, errUrl, err) => Icon(
                                   visuals.icon,

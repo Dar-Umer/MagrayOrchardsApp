@@ -19,7 +19,10 @@ class ReviewCard extends StatelessWidget {
                 radius: 16,
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 child: Text(
-                  (review.userName ?? 'U')[0].toUpperCase(),
+                  ((review.userName?.trim().isNotEmpty ?? false)
+                          ? review.userName!.trim()[0]
+                          : 'U')
+                      .toUpperCase(),
                   style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
@@ -39,10 +42,12 @@ class ReviewCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(review.comment!, style: TextStyle(color: Colors.grey.shade700, fontSize: 14, height: 1.4)),
           ],
-          if (review.createdAt != null) ...[
+          if (review.createdAt != null && review.createdAt!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              review.createdAt!.substring(0, 10),
+              review.createdAt!.length >= 10
+                  ? review.createdAt!.substring(0, 10)
+                  : review.createdAt!,
               style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
             ),
           ],

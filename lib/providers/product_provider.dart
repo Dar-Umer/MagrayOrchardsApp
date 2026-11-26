@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../models/category.dart';
@@ -201,7 +202,7 @@ class ProductProvider extends ChangeNotifier {
         _hasMore = more;
       }
     } catch (e) {
-      debugPrint('ProductProvider.fetchProducts error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchProducts error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load products. Please check your connection.';
     }
 
@@ -264,7 +265,7 @@ class ProductProvider extends ChangeNotifier {
       _catalogPage = page;
       _catalogHasMore = _parseHasMore(response, loaded.length);
     } catch (e) {
-      debugPrint('ProductProvider.fetchCatalog error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchCatalog error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load products.';
     }
     _catalogLoading = false;
@@ -326,7 +327,7 @@ class ProductProvider extends ChangeNotifier {
       _infiniteHasMore = more && loaded.isNotEmpty;
       _infiniteInitialized = true;
     } catch (e) {
-      debugPrint('ProductProvider.loadMoreInfiniteProducts error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.loadMoreInfiniteProducts error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load more products.';
     } finally {
       _infiniteLoading = false;
@@ -357,7 +358,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _offerProducts = items.map((p) => Product.fromJson(p)).toList();
     } catch (e) {
-      debugPrint('ProductProvider.fetchOfferProducts error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchOfferProducts error: $e');
       _errorMessage =
           e is ApiException ? e.message : 'Could not load offers.';
     }
@@ -407,7 +408,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _sectionProducts[key] = items.map((p) => Product.fromJson(p)).toList();
     } catch (e) {
-      debugPrint('ProductProvider.fetchSectionProducts error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchSectionProducts error: $e');
       _sectionProducts[key] = [];
     }
     _sectionLoading[key] = false;
@@ -437,7 +438,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _categories = items.map((c) => Category.fromJson(c)).toList();
     } catch (e) {
-      debugPrint('ProductProvider.fetchCategories error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchCategories error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load categories.';
     } finally {
       _categoriesLoading = false;
@@ -454,7 +455,7 @@ class ProductProvider extends ChangeNotifier {
           .map((b) => Brand.fromJson(b as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      debugPrint('ProductProvider.fetchBrands error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchBrands error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load brands.';
     } finally {
       _brandsLoading = false;
@@ -478,7 +479,7 @@ class ProductProvider extends ChangeNotifier {
       }
       _services = items.map((s) => ServiceModel.fromJson(s)).toList();
     } catch (e) {
-      debugPrint('ProductProvider.fetchServices error: $e');
+      if (kDebugMode) debugPrint('ProductProvider.fetchServices error: $e');
       _errorMessage = e is ApiException ? e.message : 'Could not load services.';
     } finally {
       _servicesLoading = false;

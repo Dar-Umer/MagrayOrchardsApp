@@ -16,6 +16,16 @@ class NotificationProvider extends ChangeNotifier {
   int get unreadCount => _unreadCount;
   String? get error => _error;
 
+  void reset() {
+    _notifications = [];
+    _isLoading = false;
+    _hasMore = true;
+    _page = 1;
+    _unreadCount = 0;
+    _error = null;
+    notifyListeners();
+  }
+
   Future<void> loadNotifications({bool refresh = false}) async {
     if (_isLoading) return;
     if (refresh) {

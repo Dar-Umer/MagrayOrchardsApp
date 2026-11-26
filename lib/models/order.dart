@@ -83,7 +83,7 @@ class Order {
       notes: json['notes'],
       cancellationReason: json['cancellation_reason'],
       cancelledAt: json['cancelled_at'] != null
-          ? DateTime.parse(json['cancelled_at'])
+          ? DateTime.tryParse(json['cancelled_at'].toString())
           : null,
       shipment: json['shipment'] is Map
           ? Map<String, dynamic>.from(json['shipment'])
@@ -94,10 +94,10 @@ class Order {
               .toList() ??
           [],
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
+          ? DateTime.tryParse(json['created_at'].toString())
           : null,
       deliveredAt: json['delivered_at'] != null
-          ? DateTime.parse(json['delivered_at'])
+          ? DateTime.tryParse(json['delivered_at'].toString())
           : null,
     );
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -9,7 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/app_loading_indicator.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/maintenance_screen.dart';
 import '../widgets/skeleton_box.dart';
+import '../widgets/update_required_screen.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
@@ -58,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _searchDebounce;
   String _searchQuery = '';
   bool _isListening = false;
+  bool _showingGateScreen = false;
   final SpeechToText _speech = SpeechToText();
 
   @override
@@ -128,8 +132,30 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<ThemeProvider>().refresh();
       context.read<PersonalizationProvider>().fetchPersonalizedFeed(force: true);
     }
-    await ShopConfig.load();
+    final ok = await ShopConfig.load();
     if (!mounted) return;
+    if (ok && !_showingGateScreen) {
+      if (ShopConfig.maintenanceEnabled) {
+        _showingGateScreen = true;
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const MaintenanceScreen()))
+            .whenComplete(() => _showingGateScreen = false);
+        return;
+      }
+      try {
+        final info = await PackageInfo.fromPlatform();
+        if (mounted &&
+            ShopConfig.compareVersions(info.version, ShopConfig.minVersion) < 0) {
+          _showingGateScreen = true;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => UpdateRequiredScreen(installedVersion: info.version),
+            ),
+          );
+          return;
+        }
+      } catch (_) {}
+    }
     if (fetchSections) {
       final pp = context.read<ProductProvider>();
       _fetchSectionProducts(pp, forceRefresh: true);
@@ -262,32 +288,37 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    final Widget activeBody = switch (_currentIndex) {
-      1 => const ReelsScreen(),
-      2 => const ServicesTab(),
-      3 => const CartTab(),
-      4 => const ProfileTab(),
-      _ => Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: AnnotatedRegion<SystemUiOverlayStyle>(
-              value: SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: scheme.brightness == Brightness.dark
-                    ? Brightness.light
-                    : Brightness.dark,
-                statusBarBrightness: scheme.brightness,
-              ),
-              child: SafeArea(
-                top: true,
-                bottom: false,
-                child: _buildHomeBody(context, scheme),
-              ),
-            ),
+    final Widget homeBody = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: scheme.brightness == Brightness.dark
+                ? Brightness.light
+                : Brightness.dark,
+            statusBarBrightness: scheme.brightness,
+          ),
+          child: SafeArea(
+            top: true,
+            bottom: false,
+            child: _buildHomeBody(context, scheme),
           ),
         ),
-    };
+      ),
+    );
+
+    final Widget activeBody = IndexedStack(
+      index: _currentIndex,
+      children: [
+        homeBody,
+        _currentIndex == 1 ? const ReelsScreen() : const SizedBox.shrink(),
+        const ServicesTab(),
+        const CartTab(),
+        const ProfileTab(),
+      ],
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1475,7 +1506,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(8),
                         child: brand.logo != null
                             ? AppNetworkImage(
-                                imageUrl: '${ApiConfig.imageBaseUrl}${brand.logo}',
+                                imageUrl: ApiConfig.resolveImageUrl(brand.logo),
                                 fit: BoxFit.contain,
                                 errorWidget: (_, __, ___) => Icon(Icons.business, color: primary),
                                 placeholder: (_, __) => Icon(Icons.business, color: primary),
@@ -1780,7 +1811,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       if (banner.image != null)
                         AppNetworkImage(
-                          imageUrl: '${ApiConfig.imageBaseUrl}${banner.image}',
+                          imageUrl: ApiConfig.resolveImageUrl(banner.image),
                           fit: BoxFit.cover,
                         )
                       else
@@ -1869,7 +1900,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ClipOval(
                     child: cat.image != null
                         ? AppNetworkImage(
-                            imageUrl: '${ApiConfig.imageBaseUrl}${cat.image}',
+                            imageUrl: ApiConfig.resolveImageUrl(cat.image),
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) =>
                                 Icon(Icons.eco, color: primary),
@@ -2179,7 +2210,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                   child: AppNetworkImage(
                                     imageUrl:
-                                        '${ApiConfig.imageBaseUrl}${service.image}',
+                                        ApiConfig.resolveImageUrl(service.image),
                                     fit: BoxFit.cover,
                                   ),
                                 )

@@ -45,6 +45,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _shippingMessage;
   int? _estimatedDays;
   double _walletBalance = 0;
+  dynamic _pendingRazorpayOrder;
 
   bool get _isExpress =>
       widget.expressItems != null && widget.expressItems!.isNotEmpty;
@@ -69,6 +70,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay = createRazorpay();
     _razorpay.on('payment.success', _handlePaymentSuccess);
     _razorpay.on('payment.error', _handlePaymentError);
+    _razorpay.on('payment.external_wallet', _handleExternalWallet);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final addressProvider = context.read<AddressProvider>();
       addressProvider.fetchAddresses().then((_) {
@@ -325,7 +327,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final userEmail = auth.user?.email ?? '';
       final userPhone = auth.user?.phone ?? '';
 
-      final razorpayAmount = (amount is num) ? (amount * 100).toInt() : 0;
+      final razorpayAmount = (amount is num) ? (amount * 100).round() : 0;
+      _pendingRazorpayOrder = order;
       var options = {
         'key': razorpayKeyId,
         'amount': razorpayAmount,
@@ -398,9 +401,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final userEmail = auth.user?.email ?? '';
         final userPhone = auth.user?.phone ?? '';
 
+        _pendingRazorpayOrder = order;
         var options = {
           'key': razorpayKeyId,
-          'amount': (remaining * 100).toInt(),
+          'amount': (remaining * 100).round(),
           'name': 'Magray Orchards',
           'order_id': razorpayOrderId,
           'description': 'Order ${order.orderNumber} (${formatCurrency(walletBalance)} from wallet)',
@@ -439,7 +443,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) {
         if (!_isExpress) await context.read<CartProvider>().clearCart();
         if (!mounted) return;
-        final orderNum = context.read<OrderProvider>().lastCreatedOrder?.orderNumber;
+        final orderNum = _pendingRazorpayOrder?.orderNumber ??
+            context.read<OrderProvider>().lastCreatedOrder?.orderNumber;
+        _pendingRazorpayOrder = null;
         _showSuccessDialog(
           'Payment Successful!',
           'Your order has been placed and payment received.',
@@ -452,16 +458,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           SnackBar(content: Text(e is ApiException ? e.message : 'Payment could not be verified. Please check your order status.'), backgroundColor: Colors.red),
         );
       }
+    } finally {
+      if (mounted) setState(() => _placingOrder = false);
     }
   }
 
   void _handlePaymentError(dynamic response) {
     if (mounted) {
+      setState(() => _placingOrder = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Payment failed: ${response is Map ? (response['message'] ?? 'Something went wrong with the payment. Please try again.') : (response.message ?? 'Something went wrong with the payment. Please try again.')}'),
           backgroundColor: Colors.red,
         ),
+      );
+    }
+  }
+
+  void _handleExternalWallet(dynamic response) {
+    if (mounted) {
+      setState(() => _placingOrder = false);
+      final name = response is Map ? (response['wallet_name'] ?? 'External Wallet') : 'External Wallet';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Redirected to $name. Please check order status shortly.')),
       );
     }
   }
@@ -948,12 +967,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         color: cs.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: item.product.image != null
+                      child: item.product.image != null &&
+                              item.product.image!.trim().isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: AppNetworkImage(
-                                imageUrl:
-                                    '${ApiConfig.imageBaseUrl}${item.product.image}',
+                                imageUrl: ApiConfig.resolveImageUrl(
+                                    item.product.image),
                                 fit: BoxFit.cover,
                                 errorWidget: (_, _, _) =>
                                     Icon(Icons.eco, color: cs.primary, size: 22),

@@ -50,6 +50,13 @@ class BookingPayment {
       razorpay.clear();
     });
 
+    razorpay.on('payment.external_wallet', (_) {
+      if (!completer.isCompleted) {
+        completer.complete(BookingPaymentResult.cancelled);
+      }
+      razorpay.clear();
+    });
+
     final dynamic rawAmount = order['amount'];
     final double amountInRupees = rawAmount is num
         ? rawAmount.toDouble()

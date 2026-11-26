@@ -29,5 +29,22 @@ class ApiConfig {
     return '$baseUrl/images/';
   }
 
+  /// Resolves a relative storage path or full URL into a fetchable image URL.
+  static String resolveImageUrl(String? path) {
+    if (path == null) return '';
+    var cleaned = path.trim();
+    if (cleaned.isEmpty) return '';
+    if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+      return cleaned;
+    }
+    while (cleaned.startsWith('/')) {
+      cleaned = cleaned.substring(1);
+    }
+    if (cleaned.startsWith('storage/')) {
+      cleaned = cleaned.substring('storage/'.length);
+    }
+    return '$imageBaseUrl$cleaned';
+  }
+
   static String _stripTrailingSlash(String url) => url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 }

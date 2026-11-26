@@ -59,6 +59,14 @@ class PersonalizationProvider extends ChangeNotifier {
     await UserActivityService.clearLocalHistory();
   }
 
+  void reset() {
+    _recentlyViewed = [];
+    _buyAgainProducts = [];
+    _wishlistPicks = [];
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   /// Fetch the server-computed personalized feed bundle
   Future<void> fetchPersonalizedFeed({bool force = false}) async {
     if (_isLoading && !force) return;

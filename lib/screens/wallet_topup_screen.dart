@@ -28,6 +28,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     _razorpay = createRazorpay();
     _razorpay.on('payment.success', _handlePaymentSuccess);
     _razorpay.on('payment.error', _handlePaymentError);
+    _razorpay.on('payment.external_wallet', _handleExternalWallet);
   }
 
   @override
@@ -61,7 +62,7 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
 
       final options = {
         'key': data['key'] ?? '',
-        'amount': (amount * 100).toInt(),
+        'amount': (amount * 100).round(),
         'name': 'Magray Orchards',
         'order_id': _razorpayOrderId,
         'description': 'Wallet Top-up',
@@ -128,11 +129,22 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
 
   void _handlePaymentError(dynamic response) {
     if (mounted) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(response is Map ? (response['message'] ?? 'Payment failed. Please try again.') : (response.message ?? 'Payment failed. Please try again.')),
           backgroundColor: Colors.red,
         ),
+      );
+    }
+  }
+
+  void _handleExternalWallet(dynamic response) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      final name = response is Map ? (response['wallet_name'] ?? 'External Wallet') : 'External Wallet';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Redirected to $name. Refreshing wallet shortly.')),
       );
     }
   }
