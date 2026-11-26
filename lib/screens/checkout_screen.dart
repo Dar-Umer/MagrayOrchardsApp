@@ -44,6 +44,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool? _serviceable;
   String? _shippingMessage;
   int? _estimatedDays;
+  String? _estimatedDeliveryDate;
   double _walletBalance = 0;
   dynamic _pendingRazorpayOrder;
 
@@ -155,6 +156,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _shippingMessage = data['message']?.toString();
         final days = data['estimated_days'];
         _estimatedDays = days is num ? days.toInt() : (days is String ? int.tryParse(days) : null);
+        _estimatedDeliveryDate = data['estimated_delivery_date']?.toString();
       });
     } catch (_) {
       setState(() {
@@ -163,6 +165,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _serviceable = null;
         _shippingMessage = null;
         _estimatedDays = null;
+        _estimatedDeliveryDate = null;
       });
     } finally {
       if (mounted) setState(() => _shippingLoading = false);
@@ -908,7 +911,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ? 'Checking delivery availability...'
                         : (_serviceable == true
                             ? (_estimatedDays != null
-                                ? 'Delivery available • Est. $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}'
+                                ? 'Delivery available • Est. $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}${_estimatedDeliveryDate != null ? ' ($_estimatedDeliveryDate)' : ''}'
                                 : 'Delivery available to selected pincode')
                             : (_shippingMessage ?? 'Delivery may not be available for this pincode')),
                     style: TextStyle(
@@ -1124,7 +1127,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   const Text('Estimated Delivery', style: TextStyle(color: Colors.grey)),
                   Text(
-                    'In $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}',
+                    'In $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}${_estimatedDeliveryDate != null ? ' ($_estimatedDeliveryDate)' : ''}',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ],

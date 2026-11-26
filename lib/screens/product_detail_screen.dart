@@ -985,7 +985,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     if (_pincodeResult!['estimated_days'] != null)
                       Text(
-                        'Estimated delivery within ${_pincodeResult!['estimated_days']} business days',
+                        _pincodeResult!['estimated_delivery_date'] != null
+                            ? 'Estimated delivery by ${_pincodeResult!['estimated_delivery_date']} (${_pincodeResult!['estimated_days']} days)'
+                            : 'Estimated delivery within ${_pincodeResult!['estimated_days']} business days',
                         style: TextStyle(color: Colors.grey.shade700, fontSize: 12, fontWeight: FontWeight.w500),
                       ),
                   ],
