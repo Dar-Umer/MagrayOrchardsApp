@@ -133,6 +133,15 @@ class _WishlistScreenState extends State<WishlistScreen> {
           }
 
           if (provider.items.isEmpty) {
+            if (provider.errorMessage != null) {
+              return EmptyState(
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load wishlist',
+                message: provider.errorMessage!,
+                actionLabel: 'Retry',
+                onAction: () => provider.fetchWishlist(),
+              );
+            }
             return const EmptyState(
               icon: Icons.favorite_border,
               title: 'Your wishlist is empty',

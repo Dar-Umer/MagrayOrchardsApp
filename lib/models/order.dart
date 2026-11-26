@@ -13,6 +13,7 @@ class Order {
   final String? paymentStatus;
   final String? razorpayOrderId;
   final String? razorpayPaymentId;
+  final String? refundId;
   final Map<String, dynamic>? shippingAddress;
   final Map<String, dynamic>? billingAddress;
   final String? notes;
@@ -39,6 +40,7 @@ class Order {
     this.paymentStatus,
     this.razorpayOrderId,
     this.razorpayPaymentId,
+    this.refundId,
     this.shippingAddress,
     this.billingAddress,
     this.notes,
@@ -59,6 +61,24 @@ class Order {
   }
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    String? resolvedRefundId = json['refund_id']?.toString();
+    if ((resolvedRefundId == null || resolvedRefundId.isEmpty) && json['payments'] is List) {
+      for (final p in (json['payments'] as List).reversed) {
+        if (p is Map && p['status']?.toString().toLowerCase() == 'refunded') {
+          final txId = p['transaction_id']?.toString();
+          final gwId = p['gateway_response'] is Map ? p['gateway_response']['id']?.toString() : null;
+          if (txId != null && txId.isNotEmpty) {
+            resolvedRefundId = txId;
+            break;
+          }
+          if (gwId != null && gwId.isNotEmpty) {
+            resolvedRefundId = gwId;
+            break;
+          }
+        }
+      }
+    }
+
     return Order(
       id: json['id'] ?? 0,
       orderNumber: json['order_number'] ?? '',
@@ -74,6 +94,7 @@ class Order {
       paymentStatus: json['payment_status'],
       razorpayOrderId: json['razorpay_order_id'],
       razorpayPaymentId: json['razorpay_payment_id'],
+      refundId: resolvedRefundId,
       shippingAddress: json['shipping_address'] is Map
           ? Map<String, dynamic>.from(json['shipping_address'])
           : null,

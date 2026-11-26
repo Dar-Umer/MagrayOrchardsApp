@@ -52,8 +52,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _refresh() async {
-    await context.read<NotificationProvider>().loadNotifications(refresh: true);
-    await context.read<NotificationProvider>().loadUnreadCount();
+    final provider = context.read<NotificationProvider>();
+    await provider.loadNotifications(refresh: true);
+    if (!mounted) return;
+    await provider.loadUnreadCount();
   }
 
   void _openNotification(PushNotification n) {

@@ -139,7 +139,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
             reel: reel,
             isActive: index == _currentIndex,
             onLike: () => _ensureLoggedIn().then((ok) {
-              if (ok) context.read<ReelsProvider>().toggleLike(reel);
+              if (ok && mounted) context.read<ReelsProvider>().toggleLike(reel);
             }),
             onComment: () => _ensureLoggedIn().then((ok) {
               if (ok) _openComments(reel);

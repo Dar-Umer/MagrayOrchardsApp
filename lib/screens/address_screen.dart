@@ -129,6 +129,15 @@ class _AddressScreenState extends State<AddressScreen> {
           }
 
           if (provider.addresses.isEmpty) {
+            if (provider.errorMessage != null) {
+              return EmptyState(
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load addresses',
+                message: provider.errorMessage!,
+                actionLabel: 'Retry',
+                onAction: () => provider.fetchAddresses(),
+              );
+            }
             return const EmptyState(
               icon: Icons.location_off,
               title: 'No addresses saved',
@@ -140,7 +149,7 @@ class _AddressScreenState extends State<AddressScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                 itemCount: provider.addresses.length,
             itemBuilder: (context, index) {
               final address = provider.addresses[index];
@@ -206,7 +215,11 @@ class _AddressScreenState extends State<AddressScreen> {
                         style: const TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 12),
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
+                        runSpacing: 4,
                         children: [
                           Text(
                             'Pincode: ${address.pincode}',
@@ -215,36 +228,41 @@ class _AddressScreenState extends State<AddressScreen> {
                               color: Colors.grey.shade600,
                             ),
                           ),
-                          const Spacer(),
-                          if (!address.isDefault)
-                            TextButton.icon(
-                              icon: Icon(Icons.star_border, size: 18, color: cs.primary),
-                              label: Text('Set Default', style: TextStyle(color: cs.primary)),
-                              onPressed: () => _setDefault(address),
-                            ),
-                          TextButton.icon(
-                            icon: const Icon(Icons.edit, size: 18),
-                            label: const Text('Edit'),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AddressFormScreen(
-                                  address: address,
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: [
+                              if (!address.isDefault)
+                                TextButton.icon(
+                                  icon: Icon(Icons.star_border, size: 18, color: cs.primary),
+                                  label: Text('Set Default', style: TextStyle(color: cs.primary)),
+                                  onPressed: () => _setDefault(address),
+                                ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.edit, size: 18),
+                                label: const Text('Edit'),
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AddressFormScreen(
+                                      address: address,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          TextButton.icon(
-                            icon: const Icon(
-                              Icons.delete,
-                              size: 18,
-                              color: Colors.red,
-                            ),
-                            label: const Text(
-                              'Delete',
-                              style: TextStyle(color: Colors.red),
-                            ),
-                            onPressed: () => _confirmDelete(address),
+                              TextButton.icon(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
+                                label: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                onPressed: () => _confirmDelete(address),
+                              ),
+                            ],
                           ),
                         ],
                       ),

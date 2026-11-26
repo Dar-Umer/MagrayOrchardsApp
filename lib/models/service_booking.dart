@@ -183,8 +183,9 @@ class ServiceBookingModel {
   bool get isPayOnVisit => paymentMethod == 'visit' || paymentMethod == 'cod';
   bool get isPayOnline => paymentMethod == 'online' || paymentMethod == 'razorpay';
   String get paymentMethodLabel => isPayOnVisit ? 'Pay on Visit' : 'Online Payment';
-  String get paymentMethodFullLabel =>
-      isPayOnVisit ? 'Pay on Visit (Cash / UPI)' : 'Paid Online (Razorpay)';
+  String get paymentMethodFullLabel => isPayOnVisit
+      ? 'Pay on Visit (Cash / UPI)'
+      : (isPaid ? 'Paid Online (Razorpay)' : 'Online Payment (Razorpay)');
   bool get isCancelled => status.toLowerCase() == 'cancelled';
   bool get isCancellable =>
       status.toLowerCase() == 'pending' &&

@@ -439,7 +439,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                           if (!_isRegister && ShopConfig.otpVerificationEnabled) ...[
                             const SizedBox(height: 12),
                             Container(
-                              height: 38,
+                              height: 44,
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade100,

@@ -263,9 +263,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Icon(isCancelled ? Icons.cancel : Icons.timer_off,
                     color: isCancelled ? Colors.red : Colors.amber.shade800),
                 const SizedBox(width: 8),
-                Text(isCancelled ? 'Subscription Cancelled' : 'Subscription Expired',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
+                Expanded(
+                  child: Text(
+                    isCancelled ? 'Subscription Cancelled' : 'Subscription Expired',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 _statusChip(status),
               ],
             ),

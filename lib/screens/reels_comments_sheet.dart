@@ -59,13 +59,16 @@ class _ReelsCommentsSheetState extends State<ReelsCommentsSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final media = MediaQuery.of(context);
+    final availableHeight = media.size.height - media.viewInsets.bottom - media.padding.top;
+    final sheetHeight = (media.size.height * 0.7).clamp(240.0, availableHeight > 240.0 ? availableHeight : 240.0);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom: media.viewInsets.bottom,
         ),
         child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.7,
+          height: sheetHeight,
           child: Column(
             children: [
               const SizedBox(height: 8),

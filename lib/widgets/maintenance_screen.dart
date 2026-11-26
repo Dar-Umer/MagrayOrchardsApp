@@ -77,9 +77,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                     children: [
                       Icon(Icons.schedule, size: 18, color: primary),
                       const SizedBox(width: 6),
-                      Text(
-                        'Expected to resume: $until',
-                        style: TextStyle(fontWeight: FontWeight.w600, color: primary),
+                      Flexible(
+                        child: Text(
+                          'Expected to resume: $until',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: primary),
+                        ),
                       ),
                     ],
                   ),

@@ -744,9 +744,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             children: [
               Icon(Icons.local_shipping, color: cs.primary, size: 20),
               const SizedBox(width: 8),
-              Text(
-                'You qualify for free shipping!',
-                style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'You qualify for free shipping!',
+                  style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -1126,9 +1128,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Estimated Delivery', style: TextStyle(color: Colors.grey)),
-                  Text(
-                    'In $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}${_estimatedDeliveryDate != null ? ' ($_estimatedDeliveryDate)' : ''}',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      'In $_estimatedDays day${_estimatedDays == 1 ? '' : 's'}${_estimatedDeliveryDate != null ? ' ($_estimatedDeliveryDate)' : ''}',
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -1262,6 +1268,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               )
             : Text(
                 buttonText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
               ),
       ),

@@ -151,6 +151,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
             );
           }
           if (provider.orders.isEmpty) {
+            if (provider.errorMessage != null) {
+              return EmptyState(
+                icon: Icons.error_outline_rounded,
+                title: 'Could not load orders',
+                message: provider.errorMessage!,
+                actionLabel: 'Retry',
+                onAction: () => provider.fetchOrders(),
+              );
+            }
             return EmptyState(
               icon: Icons.shopping_bag_outlined,
               title: 'No orders yet',
@@ -264,7 +273,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildFilterChips(OrderProvider provider, ColorScheme cs) {
     return SizedBox(
-      height: 38,
+      height: 44,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -360,40 +369,47 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.receipt_long_rounded, size: 16, color: Colors.grey.shade700),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Order #${order.orderNumber}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14.5,
-                                color: Color(0xFF0F172A),
-                              ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            if (order.createdAt != null)
-                              Text(
-                                formatDate(order.createdAt),
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.grey.shade500,
+                            child: Icon(Icons.receipt_long_rounded, size: 16, color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Order #${order.orderNumber}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14.5,
+                                    color: Color(0xFF0F172A),
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
-                      ],
+                                if (order.createdAt != null)
+                                  Text(
+                                    formatDate(order.createdAt),
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     // Single Status Badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
@@ -408,7 +424,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           Icon(status.$3, size: 13, color: status.$2),
                           const SizedBox(width: 4),
                           Text(
-                            order.status[0].toUpperCase() + order.status.substring(1),
+                            order.status.isNotEmpty
+                                ? order.status[0].toUpperCase() + order.status.substring(1)
+                                : 'Unknown',
                             style: TextStyle(
                               color: status.$2,
                               fontWeight: FontWeight.w700,
@@ -560,27 +578,50 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             ),
                             if (order.paymentMethod != null) ...[
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: order.paymentStatus?.toLowerCase() == 'paid'
-                                      ? const Color(0xFFECFDF5)
-                                      : const Color(0xFFFFFBEB),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  order.paymentMethod == 'cod'
-                                      ? 'COD'
-                                      : (order.paymentStatus?.toLowerCase() == 'paid' ? 'Paid' : 'Unpaid'),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: order.paymentStatus?.toLowerCase() == 'paid'
+                              Builder(builder: (_) {
+                                final payStatus = (order.paymentStatus ?? '').toLowerCase();
+                                final isRefunded = payStatus == 'refunded' || order.status.toLowerCase() == 'refunded';
+                                final isPaid = !isRefunded && payStatus == 'paid';
+                                final isFailed = !isRefunded && payStatus == 'failed';
+                                final bgColor = isRefunded
+                                    ? const Color(0xFFFAF5FF)
+                                    : isPaid
+                                        ? const Color(0xFFECFDF5)
+                                        : isFailed
+                                            ? const Color(0xFFFEF2F2)
+                                            : const Color(0xFFFFFBEB);
+                                final textColor = isRefunded
+                                    ? const Color(0xFF9333EA)
+                                    : isPaid
                                         ? const Color(0xFF059669)
-                                        : const Color(0xFFD97706),
+                                        : isFailed
+                                            ? const Color(0xFFDC2626)
+                                            : const Color(0xFFD97706);
+                                final label = isRefunded
+                                    ? 'Refunded'
+                                    : order.paymentMethod == 'cod'
+                                        ? 'COD'
+                                        : isPaid
+                                            ? 'Paid'
+                                            : isFailed
+                                                ? 'Failed'
+                                                : 'Unpaid';
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                ),
-                              ),
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                );
+                              }),
                             ],
                           ],
                         ),

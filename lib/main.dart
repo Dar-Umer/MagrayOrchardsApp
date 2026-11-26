@@ -70,7 +70,7 @@ void setupPushListeners() {
     }
     // Refresh unread badge.
     final navCtx = appNavigatorKey.currentContext;
-    if (navCtx != null) {
+    if (navCtx != null && navCtx.mounted) {
       final provider = navCtx.read<NotificationProvider>();
       provider.loadUnreadCount();
     }
@@ -178,6 +178,16 @@ class MagrayOrchardsApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               navigatorKey: appNavigatorKey,
               theme: themeProvider.themeData,
+              builder: (context, child) {
+                if (child == null) return const SizedBox.shrink();
+                return SafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  bottom: true,
+                  child: child,
+                );
+              },
               home: const SplashScreen(),
               routes: {
                 '/home': (_) => const HomeScreen(),

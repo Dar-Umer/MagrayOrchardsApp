@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
@@ -331,6 +332,60 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _registerPushToken() async {
     await PushService.instance.registerToken(this);
     PushService.instance.watchTokenRefresh(this);
+  }
+
+  static const int maxAvatarBytes = 1024 * 1024; // 1 MB strict limit
+  static const Set<String> _allowedAvatarExts = {'jpg', 'jpeg', 'png', 'webp'};
+
+  static bool _hasValidImageMagicBytes(Uint8List bytes) {
+    if (bytes.length < 12) return false;
+    // JPEG: FF D8 FF
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return true;
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return true;
+    // WEBP: RIFF....WEBP
+    if (bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> uploadAvatar(Uint8List bytes, String filename) async {
+    _errorMessage = null;
+    if (bytes.isEmpty || bytes.length > maxAvatarBytes) {
+      _errorMessage = 'Profile picture must be 1 MB or smaller.';
+      return false;
+    }
+    final cleanName = filename.split(RegExp(r'[/\\]')).last.trim();
+    final dotIdx = cleanName.lastIndexOf('.');
+    final ext = dotIdx >= 0 ? cleanName.substring(dotIdx + 1).toLowerCase() : '';
+    if (!_allowedAvatarExts.contains(ext) || !_hasValidImageMagicBytes(bytes)) {
+      _errorMessage = 'Only valid JPG, PNG, or WEBP images are allowed.';
+      return false;
+    }
+
+    try {
+      final response = await ApiService.uploadMultipart(
+        '/profile/avatar',
+        fieldName: 'avatar',
+        bytes: bytes,
+        filename: 'avatar.$ext',
+      );
+      final data = response['data'] ?? response;
+      _user = User.fromJson(data['user'] ?? data);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e is ApiException ? e.message : 'Could not upload profile picture.';
+      return false;
+    }
   }
 
   Future<bool> updateProfile({String? name, String? phone}) async {

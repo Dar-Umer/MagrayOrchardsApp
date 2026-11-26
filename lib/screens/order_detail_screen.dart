@@ -124,38 +124,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           icon: const Icon(Icons.cancel_rounded, color: Colors.red, size: 48),
           title: const Text('Cancel Order?', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: reason,
-                decoration: const InputDecoration(
-                  labelText: 'Reason for cancelling',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: reason,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason for cancelling',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _cancelReasons
+                      .map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: (v) => setDialogState(() => reason = v),
+                  validator: (v) => v == null ? 'Please select a reason' : null,
                 ),
-                items: _cancelReasons
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
-                onChanged: (v) => setDialogState(() => reason = v),
-                validator: (v) => v == null ? 'Please select a reason' : null,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: refundMethod,
-                decoration: const InputDecoration(
-                  labelText: 'Refund method',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: refundMethod,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Refund method',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'wallet', child: Text('Refund to Wallet (Instant)', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'original', child: Text('Original Payment Method', overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: (v) => setDialogState(() => refundMethod = v),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'wallet', child: Text('Refund to Wallet (Instant)')),
-                  DropdownMenuItem(value: 'original', child: Text('Original Payment Method')),
-                ],
-                onChanged: (v) => setDialogState(() => refundMethod = v),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -456,7 +460,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ? 'Refund Processed'
                               : isDelivered
                                   ? 'Delivered Successfully'
-                                  : 'Order ${_o.status[0].toUpperCase()}${_o.status.substring(1)}',
+                                  : _o.status.isNotEmpty
+                                      ? 'Order ${_o.status[0].toUpperCase()}${_o.status.substring(1)}'
+                                      : 'Order Status',
                       style: TextStyle(
                         fontSize: 16.5,
                         fontWeight: FontWeight.w800,
@@ -616,32 +622,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Tracking Number', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                Row(
-                  children: [
-                    Text(
-                      trackingNumber,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, fontFamily: 'monospace'),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () => _copyToClipboard(trackingNumber, 'Tracking Number'),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(Icons.copy_rounded, size: 15, color: cs.primary),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          trackingNumber,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, fontFamily: 'monospace'),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => _copyToClipboard(trackingNumber, 'Tracking Number'),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(Icons.copy_rounded, size: 15, color: cs.primary),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
           ],
 
-          if (s['status'] != null) ...[
+          if (s['status'] != null && s['status'].toString().isNotEmpty) ...[
             _infoRow(
               'Shipment Status',
-              '${s['status'][0].toUpperCase()}${s['status'].substring(1)}',
+              '${s['status'].toString()[0].toUpperCase()}${s['status'].toString().substring(1)}',
               valueColor: const Color(0xFF2563EB),
             ),
             const SizedBox(height: 8),
@@ -930,9 +943,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ? 'Cash on Delivery (COD)'
         : _o.paymentMethod == 'wallet'
             ? 'Magray Wallet'
-            : 'Online Payment (Razorpay)';
+            : _o.paymentMethod == 'partial_wallet'
+                ? 'Wallet + Online (Razorpay)'
+                : 'Online Payment (Razorpay)';
 
-    final isPaid = _o.paymentStatus?.toLowerCase() == 'paid';
+    final rawPayStatus = (_o.paymentStatus ?? '').toLowerCase();
+    final isRefunded = rawPayStatus == 'refunded' || _o.status.toLowerCase() == 'refunded';
+    final isPaid = !isRefunded && rawPayStatus == 'paid';
+    final isFailed = !isRefunded && rawPayStatus == 'failed';
+
+    final badgeLabel = isRefunded
+        ? 'REFUNDED'
+        : isPaid
+            ? 'PAID'
+            : isFailed
+                ? 'FAILED'
+                : 'PENDING';
+    final badgeBg = isRefunded
+        ? const Color(0xFFFAF5FF)
+        : isPaid
+            ? const Color(0xFFECFDF5)
+            : isFailed
+                ? const Color(0xFFFEF2F2)
+                : const Color(0xFFFFFBEB);
+    final badgeText = isRefunded
+        ? const Color(0xFF9333EA)
+        : isPaid
+            ? const Color(0xFF059669)
+            : isFailed
+                ? const Color(0xFFDC2626)
+                : const Color(0xFFD97706);
 
     return Container(
       decoration: BoxDecoration(
@@ -972,22 +1012,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                methodLabel,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+              Expanded(
+                child: Text(
+                  methodLabel,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                 decoration: BoxDecoration(
-                  color: isPaid ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isPaid ? 'PAID' : 'PENDING',
+                  badgeLabel,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: isPaid ? const Color(0xFF059669) : const Color(0xFFD97706),
+                    color: badgeText,
                   ),
                 ),
               ),
@@ -996,6 +1039,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           if (_o.razorpayPaymentId != null && _o.razorpayPaymentId!.isNotEmpty) ...[
             const SizedBox(height: 8),
             _infoRow('Payment Ref', _o.razorpayPaymentId!),
+          ],
+          if (_o.refundId != null && _o.refundId!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Refund ID', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: SelectableText(
+                          _o.refundId!,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Color(0xFF9333EA),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: _o.refundId!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Refund ID copied'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.copy_rounded, size: 15, color: Color(0xFF9333EA)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
       ),
@@ -1061,9 +1144,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-        Text(
-          value,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: valueColor ?? const Color(0xFF0F172A)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: valueColor ?? const Color(0xFF0F172A)),
+          ),
         ),
       ],
     );

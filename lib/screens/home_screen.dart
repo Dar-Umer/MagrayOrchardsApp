@@ -29,7 +29,6 @@ import '../services/location_service.dart';
 import '../services/analytics_service.dart';
 import '../utils/app_navigation.dart';
 import 'login_screen.dart';
-import 'phone_input_screen.dart';
 import 'product_detail_screen.dart';
 import 'service_detail_screen.dart';
 import 'category_products_screen.dart';
@@ -740,7 +739,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final hasExplicitRecentlyViewed = sections.any((s) => s.type == 'recently_viewed');
     final hasExplicitRecommended = sections.any((s) => s.type == 'recommended');
     final hasExplicitBuyAgain = sections.any((s) => s.type == 'buy_again');
-    final hasExplicitWishlist = sections.any((s) => s.type == 'wishlist_picks');
     final hasExplicitSeasonal = sections.any((s) => s.type == 'seasonal_orchard');
 
     for (var i = 0; i < sections.length; i++) {
@@ -1192,15 +1190,21 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.history_rounded, size: 20, color: Color(0xFF800020)),
-                    const SizedBox(width: 8),
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history_rounded, size: 20, color: Color(0xFF800020)),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () => pers.clearRecentlyViewed(),
@@ -1214,7 +1218,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SizedBox(
-            height: 230,
+            height: 268,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1473,7 +1477,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: 96,
+          height: 108,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1620,36 +1624,41 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final maxSheetHeight = MediaQuery.of(sheetContext).size.height * 0.78;
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.location_on_outlined, color: primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Deliver to',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: scheme.onSurface,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxSheetHeight),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, color: primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Deliver to',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: scheme.onSurface,
+                              ),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: 'Close',
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(sheetContext),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Consumer<AddressProvider>(
+                          IconButton(
+                            tooltip: 'Close',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(sheetContext),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Consumer<AddressProvider>(
                       builder: (ctx, ap, _) {
                         if (ap.isLoading && ap.addresses.isEmpty) {
                           return const Padding(
@@ -1728,6 +1737,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
@@ -1758,6 +1769,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             );

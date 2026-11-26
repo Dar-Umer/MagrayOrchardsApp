@@ -1036,11 +1036,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   fontSize: 13,
                   fontWeight: bold ? FontWeight.bold : FontWeight.normal,
                   color: color ?? Colors.grey[800])),
-          Text(value,
-              style: TextStyle(
-                  fontSize: highlighted ? 15 : 13,
-                  fontWeight: bold ? FontWeight.bold : FontWeight.w600,
-                  color: color ?? Colors.grey[800])),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: highlighted ? 15 : 13,
+                    fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+                    color: color ?? Colors.grey[800])),
+          ),
         ],
       ),
     );

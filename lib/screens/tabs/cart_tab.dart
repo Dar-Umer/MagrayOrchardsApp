@@ -228,12 +228,16 @@ class _CartTabState extends State<CartTab> {
                         Icon(Icons.local_offer_outlined,
                             size: 15, color: Colors.green.shade700),
                         const SizedBox(width: 6),
-                        Text(
-                          'You are saving ${formatCurrency(savings)} on this order',
-                          style: TextStyle(
-                            color: Colors.green.shade800,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            'You are saving ${formatCurrency(savings)} on this order',
+                            style: TextStyle(
+                              color: Colors.green.shade800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -293,7 +297,10 @@ class _CartTabState extends State<CartTab> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
-                                  Row(
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 2,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       Text(
                                         formatCurrency(lineTotal),
@@ -302,8 +309,7 @@ class _CartTabState extends State<CartTab> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      if (item.quantity > 1) ...[
-                                        const SizedBox(width: 6),
+                                      if (item.quantity > 1)
                                         Text(
                                           '(${formatCurrency(item.unitPrice)} each)',
                                           style: TextStyle(
@@ -311,7 +317,6 @@ class _CartTabState extends State<CartTab> {
                                             fontSize: 11,
                                           ),
                                         ),
-                                      ],
                                     ],
                                   ),
                                 ],
@@ -371,20 +376,26 @@ class _CartTabState extends State<CartTab> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on_outlined,
-                                    size: 16,
-                                    color: primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Delivering to ${_pincodeController.text}',
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on_outlined,
+                                      size: 16,
+                                      color: primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        'Delivering to ${_pincodeController.text}',
+                                        style: const TextStyle(fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: () => setState(() {
                                   _usingDefaultPincode = false;

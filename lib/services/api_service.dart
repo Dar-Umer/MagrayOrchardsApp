@@ -258,6 +258,27 @@ class ApiService {
     return _makeRequest(() => _httpClient.delete(uri, headers: _headers()));
   }
 
+  static Future<dynamic> uploadMultipart(
+    String endpoint, {
+    required String fieldName,
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+    return _makeRequest(() async {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Accept'] = 'application/json';
+      if (_token != null) {
+        request.headers['Authorization'] = 'Bearer $_token';
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(fieldName, bytes, filename: filename),
+      );
+      final streamed = await _httpClient.send(request);
+      return http.Response.fromStream(streamed);
+    });
+  }
+
   // ─── Service bookings ─────────────────────────────────────────────────
 
   /// Fetch complete service detail including active tier rates, plant types, and age groups.

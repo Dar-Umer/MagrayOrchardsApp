@@ -14,7 +14,7 @@ class UpdateRequiredScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -54,7 +54,10 @@ class UpdateRequiredScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Your version', style: Theme.of(context).textTheme.bodySmall),
-                        Text(installedVersion, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(installedVersion, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -62,7 +65,10 @@ class UpdateRequiredScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Required version', style: Theme.of(context).textTheme.bodySmall),
-                        Text('${ShopConfig.latestVersion}+', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text('${ShopConfig.latestVersion}+', style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                     if (ShopConfig.updateNotes.isNotEmpty) ...[

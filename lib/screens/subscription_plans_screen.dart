@@ -83,12 +83,17 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       final data = res is Map ? Map<String, dynamic>.from(res) : await res as Map<String, dynamic>;
       if (!mounted) return;
       if (data['success'] == true) {
-        await context.read<SubscriptionProvider>().loadMySubscription();
-        await context.read<AuthProvider>().loadProfile();
-        ScaffoldMessenger.of(context).showSnackBar(
+        final subProvider = context.read<SubscriptionProvider>();
+        final authProvider = context.read<AuthProvider>();
+        final messenger = ScaffoldMessenger.of(context);
+        final navigator = Navigator.of(context);
+        await subProvider.loadMySubscription();
+        await authProvider.loadProfile();
+        if (!mounted) return;
+        messenger.showSnackBar(
           const SnackBar(content: Text('Subscribed successfully!'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context);
+        navigator.pop();
       } else {
         setState(() => _processingPayment = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,7 +136,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         ],
       ),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true || !mounted) return;
 
     final paymentMethod = await showDialog<String>(
       context: context,
@@ -150,21 +155,25 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         ],
       ),
     );
-    if (paymentMethod == null || !context.mounted) return;
+    if (paymentMethod == null || !mounted) return;
 
     if (paymentMethod == 'wallet') {
       final provider = context.read<SubscriptionProvider>();
+      final authProvider = context.read<AuthProvider>();
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
       final success = await provider.subscribe(plan.id, paymentMethod: paymentMethod);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
           content: Text(success ? 'Subscribed successfully!' : provider.errorMessage ?? 'Subscription couldn\'t be completed.'),
           backgroundColor: success ? Colors.green : Colors.red,
         ),
       );
       if (success) {
-        await context.read<AuthProvider>().loadProfile();
-        Navigator.pop(context);
+        await authProvider.loadProfile();
+        if (!mounted) return;
+        navigator.pop();
       }
       return;
     }
@@ -290,7 +299,10 @@ class _PlanCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top badges row
-            Row(
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -315,8 +327,7 @@ class _PlanCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (plan.isCurrentPlan) ...[
-                  const SizedBox(width: 8),
+                if (plan.isCurrentPlan)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -332,9 +343,7 @@ class _PlanCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
-                if (plan.isUpgrade) ...[
-                  const SizedBox(width: 8),
+                if (plan.isUpgrade)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -350,9 +359,7 @@ class _PlanCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
-                if (plan.isDowngradeBlocked) ...[
-                  const SizedBox(width: 8),
+                if (plan.isDowngradeBlocked)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -368,11 +375,8 @@ class _PlanCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
-                const Spacer(),
                 if (plan.hasFreeDelivery)
                   Container(
-                    margin: const EdgeInsets.only(right: 4),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,

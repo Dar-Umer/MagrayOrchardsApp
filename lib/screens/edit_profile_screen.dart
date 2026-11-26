@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/profile_avatar.dart';
 import 'change_password_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -17,6 +20,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   bool _isSaving = false;
+  bool _uploadingAvatar = false;
 
   int? _totalOrders;
   double? _totalSpent;
@@ -44,6 +48,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final response = await ApiService.get('/profile/dashboard');
       final data = response['data'] ?? response;
+      if (!mounted) return;
       setState(() {
         _totalOrders = (data['total_orders'] ?? 0);
         _totalSpent = (data['total_spent'] is num) ? (data['total_spent'] as num).toDouble() : double.tryParse('${data['total_spent'] ?? 0}') ?? 0.0;
@@ -100,11 +105,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _handleAvatarUpload(XFile file) async {
+    final auth = context.read<AuthProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final cs = Theme.of(context).colorScheme;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ok = await auth.uploadAvatar(bytes, file.name);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Profile picture updated!'
+                : (auth.errorMessage ?? 'Could not upload profile picture.'),
+          ),
+          backgroundColor: ok ? cs.primary : Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
     final cs = Theme.of(context).colorScheme;
+    final isSubscribed = (user?.isProMember == true) ||
+        (user?.currentPlan != null && user!.currentPlan!.isNotEmpty) ||
+        context.watch<SubscriptionProvider>().currentSubscription != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -122,6 +155,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 key: _formKey,
             child: Column(
               children: [
+                ProfileAvatar(
+                  initial: (user?.name ?? 'U').isNotEmpty
+                      ? (user?.name ?? 'U')[0].toUpperCase()
+                      : 'U',
+                  avatarPath: user?.avatar,
+                  primaryColor: cs.primary,
+                  isSubscribed: isSubscribed,
+                  radius: 44,
+                  isUploading: _uploadingAvatar,
+                  onPickImage: _handleAvatarUpload,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tap photo to upload (JPG, PNG, WEBP • max 1 MB)',
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 20),
                 // Dashboard Stats
                 if (_statsLoading)
                   const Padding(

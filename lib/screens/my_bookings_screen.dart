@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_box.dart';
-import '../config/api_config.dart';
 import '../models/service_booking.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -533,7 +532,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   Row(
                     children: [
                       Text(
-                        booking.isPayOnVisit ? 'Pay on Visit' : 'Paid Online',
+                        booking.isPayOnVisit
+                            ? 'Pay on Visit'
+                            : (booking.isPaid ? 'Paid Online' : 'Online Payment'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -588,18 +589,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _placeholder(ColorScheme cs) {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(Icons.construction, color: cs.primary, size: 28),
     );
   }
 }

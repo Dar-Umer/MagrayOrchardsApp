@@ -1236,9 +1236,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD97706), size: 18),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Dosage, Dilution & Usage Directions',
-                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 15),
+              const Expanded(
+                child: Text(
+                  'Dosage, Dilution & Usage Directions',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 15),
+                ),
               ),
             ],
           ),
@@ -1391,11 +1393,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _addToCart,
                   icon: Icon(Icons.shopping_bag_outlined, size: 16, color: cs.primary),
-                  label: Text(
-                    'Add to Cart',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: cs.primary),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Add to Cart',
+                      maxLines: 1,
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: cs.primary),
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     side: BorderSide(color: cs.primary, width: 1.5),
                     backgroundColor: cs.primary.withValues(alpha: 0.04),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1413,11 +1420,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: ElevatedButton.icon(
                   onPressed: _buyNow,
                   icon: const Icon(Icons.bolt_rounded, size: 17, color: Colors.white),
-                  label: const Text(
-                    'Buy Now',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Buy Now',
+                      maxLines: 1,
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     backgroundColor: cs.primary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

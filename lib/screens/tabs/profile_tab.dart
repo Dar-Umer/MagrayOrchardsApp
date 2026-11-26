@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/pro_member_badge.dart';
+import '../../widgets/profile_avatar.dart';
 import '../address_screen.dart';
 import '../edit_profile_screen.dart';
 import '../login_screen.dart';
@@ -18,22 +21,57 @@ import '../wallet_screen.dart';
 import '../wishlist_screen.dart';
 
 /// Account & settings tab displayed from the root navigation shell.
-class ProfileTab extends StatelessWidget {
+class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  bool _uploadingAvatar = false;
+
+  Future<void> _handleAvatarUpload(XFile file) async {
+    final auth = context.read<AuthProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final primary = Theme.of(context).colorScheme.primary;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ok = await auth.uploadAvatar(bytes, file.name);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Profile picture updated!'
+                : (auth.errorMessage ?? 'Could not upload profile picture.'),
+          ),
+          backgroundColor: ok ? primary : Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
     final primary = Theme.of(context).colorScheme.primary;
+    final isSubscribed = (user?.isProMember == true) ||
+        (user?.currentPlan != null && user!.currentPlan!.isNotEmpty) ||
+        context.watch<SubscriptionProvider>().currentSubscription != null;
 
     if (!auth.isLoggedIn) {
       return SafeArea(
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -110,29 +148,33 @@ class ProfileTab extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                const SizedBox(height: 32),
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: primary.withValues(alpha: 0.1),
-                  child: Text(
-                    (user?.name ?? 'U').isNotEmpty
-                        ? (user?.name ?? 'U')[0].toUpperCase()
-                        : 'U',
-                    style: TextStyle(fontSize: 36, color: primary),
-                  ),
+                const SizedBox(height: 24),
+                ProfileAvatar(
+                  initial: (user?.name ?? 'U').isNotEmpty
+                      ? (user?.name ?? 'U')[0].toUpperCase()
+                      : 'U',
+                  avatarPath: user?.avatar,
+                  primaryColor: primary,
+                  isSubscribed: isSubscribed,
+                  isUploading: _uploadingAvatar,
+                  onPickImage: _handleAvatarUpload,
                 ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      user?.name ?? '',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        user?.name ?? '',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (user?.isProMember == true) ...[
+                    if (isSubscribed) ...[
                       const SizedBox(width: 8),
                       const ProMemberBadge(isProMember: true, compact: true),
                     ],

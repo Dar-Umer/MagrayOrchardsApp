@@ -120,14 +120,13 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildFilterChips(ColorScheme cs) {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         _filterChip('All', null),
-        const SizedBox(width: 8),
         _filterChip('Credit', 'credit'),
-        const SizedBox(width: 8),
         _filterChip('Debit', 'debit'),
-        const SizedBox(width: 8),
         _filterChip('Refund', 'refund'),
       ],
     );
