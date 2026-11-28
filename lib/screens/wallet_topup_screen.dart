@@ -54,7 +54,11 @@ class _WalletTopUpScreenState extends State<WalletTopUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await ApiService.post('/wallet/topup', body: {'amount': amount});
+      final response = await ApiService.post(
+        '/wallet/topup',
+        body: {'amount': amount},
+        idempotencyKey: ApiService.generateIdempotencyKey('topup'),
+      );
       final data = response['data'] ?? response;
 
       _topUpAmount = amount;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -86,13 +87,24 @@ class ApiService {
 
   static String? get token => _token;
 
-  static Map<String, String> _headers() {
+  static final Random _random = Random();
+
+  static String generateIdempotencyKey([String prefix = 'req']) {
+    final ts = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final rand = _random.nextInt(0x7fffffff).toRadixString(36);
+    return '$prefix-$ts-$rand';
+  }
+
+  static Map<String, String> _headers({String? idempotencyKey}) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     if (_token != null) {
       headers['Authorization'] = 'Bearer $_token';
+    }
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      headers['Idempotency-Key'] = idempotencyKey;
     }
     return headers;
   }
@@ -226,11 +238,11 @@ class ApiService {
     return _makeRequest(() => _httpClient.get(uri, headers: _headers()));
   }
 
-  static Future<dynamic> post(String endpoint, {dynamic body}) async {
+  static Future<dynamic> post(String endpoint, {dynamic body, String? idempotencyKey}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     return _makeRequest(() => _httpClient.post(
       uri,
-      headers: _headers(),
+      headers: _headers(idempotencyKey: idempotencyKey),
       body: body != null ? json.encode(body) : null,
     ));
   }
@@ -244,11 +256,11 @@ class ApiService {
     ));
   }
 
-  static Future<dynamic> patch(String endpoint, {dynamic body}) async {
+  static Future<dynamic> patch(String endpoint, {dynamic body, String? idempotencyKey}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     return _makeRequest(() => _httpClient.patch(
       uri,
-      headers: _headers(),
+      headers: _headers(idempotencyKey: idempotencyKey),
       body: body != null ? json.encode(body) : null,
     ));
   }
@@ -364,8 +376,12 @@ class ApiService {
     int? quantity,
     List<Map<String, dynamic>>? treeItems,
     String paymentMethod = 'visit',
+    String? idempotencyKey,
   }) async {
-    final response = await post('/services/$slug/book', body: {
+    final response = await post(
+      '/services/$slug/book',
+      idempotencyKey: idempotencyKey ?? generateIdempotencyKey('book'),
+      body: {
       'booking_date': _dateStr(bookingDate),
       'booking_time': timeSlot ?? 'full_day',
       if (latitude != null) 'latitude': latitude,

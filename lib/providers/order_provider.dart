@@ -64,6 +64,7 @@ class OrderProvider extends ChangeNotifier {
     String? razorpayOrderId,
     String? razorpayPaymentId,
     double? walletAmountUsed,
+    String? idempotencyKey,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -85,7 +86,11 @@ class OrderProvider extends ChangeNotifier {
         body['wallet_amount_used'] = walletAmountUsed;
       }
 
-      final response = await ApiService.post('/orders', body: body);
+      final response = await ApiService.post(
+        '/orders',
+        body: body,
+        idempotencyKey: idempotencyKey ?? ApiService.generateIdempotencyKey('order'),
+      );
       final order = Order.fromJson(response['data']);
       _lastCreatedOrder = order;
       _isLoading = false;
